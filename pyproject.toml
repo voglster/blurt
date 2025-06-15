@@ -1,0 +1,21 @@
+[project]
+name = "tab-voice"
+version = "0.1.0"
+description = "Voice-to-text using Tab key trigger"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "numpy>=2.3.0",
+    "pvrecorder>=1.2.7",
+    "pynput>=1.8.1",
+    "python-xlib>=0.33",
+    "tomli-w>=1.2.0",
+    "vosk>=0.3.45",
+]
+
+[project.scripts]
+tab-voice = "tab_voice.main:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

@@ -1,0 +1,112 @@
+Framework key detection started at 2025-06-14 20:50:48.521200
+============================================================
+[20:50:48.521] 🔍 Framework Key Detective!
+[20:50:48.521] This will show ALL key events to find your Framework button
+[20:50:48.521] 
+[20:50:48.521] Test plan:
+[20:50:48.521] 1. First, press some normal keys (a, b, c) to see typical keycodes
+[20:50:48.521] 2. Then press your Framework button
+[20:50:48.521] 3. Look for unusual keycodes/keysyms
+[20:50:48.521] 
+[20:50:48.521] Press Ctrl+C to exit when done
+[20:50:48.521] --------------------------------------------------
+[20:50:48.534] ✅ RECORD extension available
+[20:50:48.535] Starting key monitoring...
+[20:50:48.535] Now press some normal keys (a, b, c) then your Framework button...
+[20:50:50.270] 🚨 UNUSUAL: keycode= 38, keysym=0x0061, name='a'
+[20:50:50.361]     normal: keycode= 38, keysym=0x0061, name='a'
+[20:50:51.906]     normal: keycode= 38, keysym=0x0061, name='a'
+[20:50:53.114] 🚨 UNUSUAL: keycode= 39, keysym=0x0073, name='s'
+[20:50:56.095]     normal: keycode= 39, keysym=0x0073, name='s'
+[20:50:56.613] 🚨 UNUSUAL: keycode= 40, keysym=0x0064, name='d'
+[20:50:58.126]     normal: keycode= 40, keysym=0x0064, name='d'
+[20:50:58.721]     normal: keycode= 40, keysym=0x0064, name='d'
+[20:51:01.299] 🚨 UNUSUAL: keycode=234, keysym=0x1008ff32, name='None'
+[20:51:01.299]    ⭐ HIGH KEYCODE - this might be your Framework key!
+[20:51:01.299]    ⭐ VENDOR KEYSYM - this might be your Framework key!
+[20:51:23.774] 🚨 UNUSUAL: keycode= 37, keysym=0xffe3, name='None'
+[20:51:23.897] 🚨 UNUSUAL: keycode= 64, keysym=0xffe9, name='None'
+[20:51:24.019] 🚨 UNUSUAL: keycode=113, keysym=0xff51, name='None'
+[20:51:36.833] 🚨 UNUSUAL: keycode= 36, keysym=0xff0d, name=''
+[20:51:41.879] 🚨 UNUSUAL: keycode= 57, keysym=0x006e, name='n'
+[20:51:41.986] 🚨 UNUSUAL: keycode= 32, keysym=0x006f, name='o'
+[20:51:42.452] 🚨 UNUSUAL: keycode= 28, keysym=0x0074, name='t'
+[20:51:42.985] 🚨 UNUSUAL: keycode= 26, keysym=0x0065, name='e'
+[20:51:43.134] 🚨 UNUSUAL: keycode= 65, keysym=0x0020, name=' '
+[20:51:43.292]     normal: keycode= 28, keysym=0x0074, name='t'
+[20:51:43.403] 🚨 UNUSUAL: keycode= 43, keysym=0x0068, name='h'
+[20:51:43.441] 🚨 UNUSUAL: keycode= 31, keysym=0x0069, name='i'
+[20:51:43.578]     normal: keycode= 39, keysym=0x0073, name='s'
+[20:51:43.728]     normal: keycode= 65, keysym=0x0020, name=' '
+[20:51:44.305] 🚨 UNUSUAL: keycode= 46, keysym=0x006c, name='l'
+[20:51:44.437]     normal: keycode= 38, keysym=0x0061, name='a'
+[20:51:44.645] 🚨 UNUSUAL: keycode= 30, keysym=0x0075, name='u'
+[20:51:45.178]     normal: keycode= 57, keysym=0x006e, name='n'
+[20:51:45.375] 🚨 UNUSUAL: keycode= 54, keysym=0x0063, name='c'
+[20:51:45.513]     normal: keycode= 43, keysym=0x0068, name='h'
+[20:51:45.740]     normal: keycode= 26, keysym=0x0065, name='e'
+[20:51:45.922]     normal: keycode= 40, keysym=0x0064, name='d'
+[20:51:46.020]     normal: keycode= 65, keysym=0x0020, name=' '
+[20:51:46.266]     normal: keycode= 39, keysym=0x0073, name='s'
+[20:51:46.351]     normal: keycode= 32, keysym=0x006f, name='o'
+[20:51:46.465] 🚨 UNUSUAL: keycode= 58, keysym=0x006d, name='m'
+[20:51:46.569]     normal: keycode= 26, keysym=0x0065, name='e'
+[20:51:46.726]     normal: keycode= 65, keysym=0x0020, name=' '
+[20:51:48.504]     normal: keycode= 38, keysym=0x0061, name='a'
+[20:51:48.849] 🚨 UNUSUAL: keycode= 33, keysym=0x0070, name='p'
+[20:51:48.996]     normal: keycode= 33, keysym=0x0070, name='p'
+[20:51:49.126]     normal: keycode= 65, keysym=0x0020, name=' '
+[20:51:49.297]     normal: keycode= 31, keysym=0x0069, name='i'
+[20:51:49.409]     normal: keycode= 57, keysym=0x006e, name='n'
+[20:51:49.552]     normal: keycode= 65, keysym=0x0020, name=' '
+[20:51:50.602]     normal: keycode= 30, keysym=0x0075, name='u'
+[20:51:50.726] 🚨 UNUSUAL: keycode= 56, keysym=0x0062, name='b'
+[20:51:50.808]     normal: keycode= 30, keysym=0x0075, name='u'
+[20:51:50.974]     normal: keycode= 57, keysym=0x006e, name='n'
+[20:51:51.036]     normal: keycode= 28, keysym=0x0074, name='t'
+[20:51:51.150]     normal: keycode= 30, keysym=0x0075, name='u'
+[20:51:51.313]     normal: keycode= 65, keysym=0x0020, name=' '
+[20:51:51.443]     normal: keycode= 28, keysym=0x0074, name='t'
+[20:51:51.526]     normal: keycode= 43, keysym=0x0068, name='h'
+[20:51:51.679]     normal: keycode= 32, keysym=0x006f, name='o'
+[20:51:51.737]     normal: keycode= 30, keysym=0x0075, name='u'
+[20:51:51.809] 🚨 UNUSUAL: keycode= 42, keysym=0x0067, name='g'
+[20:51:51.891]     normal: keycode= 43, keysym=0x0068, name='h'
+[20:51:52.149]     normal: keycode= 65, keysym=0x0020, name=' '
+[20:51:52.518] 🚨 UNUSUAL: keycode= 22, keysym=0xff08, name=''
+[20:51:52.867] 🚨 UNUSUAL: keycode= 60, keysym=0x002e, name='.'
+[20:51:53.142]     normal: keycode= 60, keysym=0x002e, name='.'
+[20:51:53.296]     normal: keycode= 60, keysym=0x002e, name='.'
+[20:51:54.167]     normal: keycode= 65, keysym=0x0020, name=' '
+[20:51:54.448] 🚨 UNUSUAL: keycode= 25, keysym=0x0077, name='w'
+[20:51:54.529]     normal: keycode= 43, keysym=0x0068, name='h'
+[20:51:54.673]     normal: keycode= 26, keysym=0x0065, name='e'
+[20:51:54.708]     normal: keycode= 57, keysym=0x006e, name='n'
+[20:51:54.833]     normal: keycode= 65, keysym=0x0020, name=' '
+[20:51:54.959]     normal: keycode= 31, keysym=0x0069, name='i'
+[20:51:55.060]     normal: keycode= 65, keysym=0x0020, name=' '
+[20:51:55.216]     normal: keycode= 33, keysym=0x0070, name='p'
+[20:51:55.291] 🚨 UNUSUAL: keycode= 27, keysym=0x0072, name='r'
+[20:51:55.364]     normal: keycode= 26, keysym=0x0065, name='e'
+[20:51:55.561]     normal: keycode= 39, keysym=0x0073, name='s'
+[20:51:55.720]     normal: keycode= 39, keysym=0x0073, name='s'
+[20:51:55.897]     normal: keycode= 26, keysym=0x0065, name='e'
+[20:51:56.050]     normal: keycode= 40, keysym=0x0064, name='d'
+[20:51:56.096]     normal: keycode= 65, keysym=0x0020, name=' '
+[20:51:56.217]     normal: keycode= 31, keysym=0x0069, name='i'
+[20:51:56.299]     normal: keycode= 28, keysym=0x0074, name='t'
+[20:52:04.226]     normal: keycode= 37, keysym=0xffe3, name='None'
+[20:52:04.323]     normal: keycode= 64, keysym=0xffe9, name='None'
+[20:52:04.412] 🚨 UNUSUAL: keycode=114, keysym=0xff53, name='None'
+[20:52:06.310]     normal: keycode= 37, keysym=0xffe3, name='None'
+[20:52:06.490]     normal: keycode= 54, keysym=0x0063, name='c'
+[20:52:06.491] 
+Exiting...
+[20:52:06.491] ==================================================
+[20:52:06.491] SUMMARY:
+[20:52:06.491] Look for entries marked with 🚨 UNUSUAL
+[20:52:06.491] The Framework key likely has:
+[20:52:06.491]   - High keycode (>200)
+[20:52:06.491]   - Vendor-specific keysym (>0xFFFF)
+[20:52:06.491]   - Unknown name
+[20:52:06.491] Check framework_key.log for full details.
