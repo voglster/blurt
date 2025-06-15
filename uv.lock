@@ -3,6 +3,29 @@ revision = 2
 requires-python = ">=3.12"
 
 [[package]]
+name = "blurt"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "numpy" },
+    { name = "pvrecorder" },
+    { name = "pynput" },
+    { name = "python-xlib" },
+    { name = "tomli-w" },
+    { name = "vosk" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "numpy", specifier = ">=2.3.0" },
+    { name = "pvrecorder", specifier = ">=1.2.7" },
+    { name = "pynput", specifier = ">=1.8.1" },
+    { name = "python-xlib", specifier = ">=0.33" },
+    { name = "tomli-w", specifier = ">=1.2.0" },
+    { name = "vosk", specifier = ">=0.3.45" },
+]
+
+[[package]]
 name = "certifi"
 version = "2025.4.26"
 source = { registry = "https://pypi.org/simple" }
@@ -302,29 +325,6 @@ name = "srt"
 version = "3.5.3"
 source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/66/b7/4a1bc231e0681ebf339337b0cd05b91dc6a0d701fa852bb812e244b7a030/srt-3.5.3.tar.gz", hash = "sha256:4884315043a4f0740fd1f878ed6caa376ac06d70e135f306a6dc44632eed0cc0", size = 28296, upload-time = "2023-03-28T02:35:44.007Z" }
-
-[[package]]
-name = "tab-voice"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "numpy" },
-    { name = "pvrecorder" },
-    { name = "pynput" },
-    { name = "python-xlib" },
-    { name = "tomli-w" },
-    { name = "vosk" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "numpy", specifier = ">=2.3.0" },
-    { name = "pvrecorder", specifier = ">=1.2.7" },
-    { name = "pynput", specifier = ">=1.8.1" },
-    { name = "python-xlib", specifier = ">=0.33" },
-    { name = "tomli-w", specifier = ">=1.2.0" },
-    { name = "vosk", specifier = ">=0.3.45" },
-]
 
 [[package]]
 name = "tomli-w"

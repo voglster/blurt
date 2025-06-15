@@ -19,7 +19,7 @@ Blurt is a push-to-talk voice transcription app for Linux developers and LLM use
 ## Technical Architecture
 
 ### Current Implementation
-- **Entry point**: `src/tab_voice/main.py` (needs renaming to blurt)
+- **Entry point**: `src/blurt/main.py`
 - **Hotkey handling**: `simple_hotkey.py` - uses pynput for cross-platform key detection
 - **Audio recording**: `simple_audio.py` - uses PvRecorder (no system dependencies)
 - **Speech recognition**: `speech_recognizer.py` - uses Vosk for offline transcription
@@ -89,7 +89,7 @@ Manual test checklist:
 
 ```bash
 # Current way to run
-uv run python -m tab_voice.main
+uv run python -m blurt.main
 
 # Test key detection
 uv run python test_keys.py
@@ -104,12 +104,12 @@ blurt start
 
 ## Important Context
 
-- This started as "tab_voice" - needs renaming throughout
+- Renamed from "tab_voice" to "blurt" throughout codebase
 - The Framework laptop key detection code can be removed
 - The complex async audio recorder can be simplified
 - The X11 hotkey handler didn't work well, pynput is better
 - Sound files are from the Quip project
-- Config should migrate from `~/.config/tab_voice/` to `~/.config/blurt/`
+- Config migrated from `~/.config/tab_voice/` to `~/.config/blurt/`
 
 ## Questions/Decisions Needed
 

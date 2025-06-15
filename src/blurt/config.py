@@ -1,4 +1,4 @@
-"""Configuration management for tab_voice."""
+"""Configuration management for blurt."""
 
 import os
 from pathlib import Path
@@ -11,7 +11,7 @@ class Config:
     """Configuration manager."""
     
     def __init__(self) -> None:
-        self.config_dir = Path.home() / '.config' / 'tab_voice'
+        self.config_dir = Path.home() / '.config' / 'blurt'
         self.config_file = self.config_dir / 'config.toml'
         self._config = self._load_config()
     

@@ -26,7 +26,7 @@
 - [ ] Add `blurt logs` command to tail log file
 
 ### 1.4 Configuration Updates
-- [ ] Move from `~/.config/tab_voice/` to `~/.config/blurt/`
+- [x] Move from `~/.config/tab_voice/` to `~/.config/blurt/`
 - [ ] Validate config on startup
 - [ ] Add config options:
   ```toml
@@ -386,7 +386,7 @@ echo "✅ Released v$NEW_VERSION! GitHub Actions will handle PyPI upload."
 ### Quick Commands
 ```bash
 # Run current version
-uv run python -m tab_voice.main
+uv run python -m blurt.main
 
 # Test CLI (after rename)
 python -m blurt.cli start

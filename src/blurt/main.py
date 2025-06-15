@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Main entry point for tab_voice."""
+"""Main entry point for blurt."""
 
 import asyncio
 import os
@@ -14,7 +14,7 @@ from .speech_recognizer import SpeechRecognizer
 from .text_output import TextOutput
 
 
-class TabVoice:
+class Blurt:
     """Main application class."""
     
     def __init__(self) -> None:
@@ -32,7 +32,7 @@ class TabVoice:
     
     def run(self) -> NoReturn:
         """Run the application."""
-        print("Tab Voice starting... (Press Ctrl+C to exit)")
+        print("Blurt starting... (Press Ctrl+C to exit)")
         
         try:
             self.hotkey_handler.start()
@@ -44,8 +44,8 @@ class TabVoice:
 def main() -> None:
     """Main entry point."""
     if len(sys.argv) > 1 and sys.argv[1] in ('-h', '--help'):
-        print("Tab Voice - Voice-to-text using Ctrl+Space trigger")
-        print("Usage: uv run python -m tab_voice.main")
+        print("Blurt - Voice-to-text using Ctrl+Space trigger")
+        print("Usage: uv run python -m blurt.main")
         print("Hold Ctrl+Space for push-to-talk voice recording")
         print("Uses X11 directly, no sudo needed")
         sys.exit(0)
@@ -56,7 +56,7 @@ def main() -> None:
         print("This app requires X11 (not Wayland)")
         sys.exit(1)
     
-    app = TabVoice()
+    app = Blurt()
     app.run()
 
 

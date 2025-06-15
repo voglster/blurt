@@ -1,8 +1,24 @@
 [project]
-name = "tab-voice"
+name = "blurt"
 version = "0.1.0"
-description = "Voice-to-text using Tab key trigger"
+description = "Push-to-talk voice transcription for Linux developers"
 readme = "README.md"
+license = {file = "LICENSE"}
+authors = [
+    {name = "voglster", email = "contact@example.com"},
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: X11 Applications :: Gnome",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Sound/Audio :: Speech",
+    "Topic :: Utilities",
+]
+keywords = ["voice", "transcription", "speech-to-text", "accessibility", "linux"]
 requires-python = ">=3.12"
 dependencies = [
     "numpy>=2.3.0",
@@ -14,7 +30,12 @@ dependencies = [
 ]
 
 [project.scripts]
-tab-voice = "tab_voice.main:main"
+blurt = "blurt.main:main"
+
+[project.urls]
+Homepage = "https://github.com/voglster/blurt"
+Repository = "https://github.com/voglster/blurt.git"
+Issues = "https://github.com/voglster/blurt/issues"
 
 [build-system]
 requires = ["hatchling"]
