@@ -25,8 +25,15 @@
   - [ ] Permission errors with solutions
 - [ ] Add `blurt logs` command to tail log file
 
-### 1.4 Configuration Updates
+### 1.4 Directory Structure & Configuration
 - [x] Move from `~/.config/tab_voice/` to `~/.config/blurt/`
+- [x] **Fix XDG Base Directory compliance**:
+  - [x] Config: `~/.config/blurt/config.toml` ✅ 
+  - [x] Data/Models: `~/.local/share/blurt/models/` 
+  - [x] Logs: `~/.local/state/blurt/blurt.log` 
+  - [x] Cache: `~/.cache/blurt/` (for temp downloads)
+  - [x] Update model path resolution in config.py
+  - [x] Updated speech_recognizer.py to use new paths
 - [ ] Validate config on startup
 - [ ] Add config options:
   ```toml
@@ -35,7 +42,11 @@
   
   [daemon]
   log_level = "info"
-  log_file = "~/.config/blurt/blurt.log"
+  log_file = "~/.local/state/blurt/blurt.log"
+  
+  [model]
+  data_dir = "~/.local/share/blurt"
+  cache_dir = "~/.cache/blurt"
   ```
 - [ ] Add `blurt config` command to show current config
 

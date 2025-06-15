@@ -21,7 +21,7 @@ class SpeechRecognizer:
     
     def _load_model(self) -> None:
         """Load the Vosk model."""
-        model_path = Path(self.config.model_path)
+        model_path = self.config.model_path
         
         if not model_path.exists():
             print(f"Model not found at {model_path}")
@@ -39,22 +39,29 @@ class SpeechRecognizer:
         """Download the Vosk model."""
         import urllib.request
         import zipfile
-        import tempfile
+        import os
         
         model_url = "https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip"
-        model_path = Path(self.config.model_path)
+        model_path = self.config.model_path
         
         # Create models directory
-        model_path.parent.mkdir(parents=True, exist_ok=True)
+        self.config.models_dir.mkdir(parents=True, exist_ok=True)
         
-        print("Downloading Vosk model (this may take a few minutes)...")
+        print(f"Downloading Vosk model to {self.config.models_dir}...")
+        print("This may take a few minutes...")
         
-        with tempfile.NamedTemporaryFile(suffix='.zip', delete=False) as tmp_file:
-            urllib.request.urlretrieve(model_url, tmp_file.name)
-            
-            # Extract the model
-            with zipfile.ZipFile(tmp_file.name, 'r') as zip_ref:
-                zip_ref.extractall(model_path.parent)
+        # Download to cache directory first
+        self.config.cache_dir.mkdir(parents=True, exist_ok=True)
+        zip_path = self.config.cache_dir / "vosk-model.zip"
+        
+        urllib.request.urlretrieve(model_url, zip_path)
+        
+        # Extract the model to data directory
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            zip_ref.extractall(self.config.models_dir)
+        
+        # Clean up zip file
+        os.unlink(zip_path)
         
         print(f"Model downloaded and extracted to {model_path}")
     

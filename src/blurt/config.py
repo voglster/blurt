@@ -8,11 +8,20 @@ import tomli_w
 
 
 class Config:
-    """Configuration manager."""
+    """Configuration manager following XDG Base Directory standards."""
     
     def __init__(self) -> None:
-        self.config_dir = Path.home() / '.config' / 'blurt'
+        # XDG Base Directory paths
+        self.config_dir = self._get_xdg_config_dir()
+        self.data_dir = self._get_xdg_data_dir() 
+        self.cache_dir = self._get_xdg_cache_dir()
+        self.state_dir = self._get_xdg_state_dir()
+        
+        # Specific paths
         self.config_file = self.config_dir / 'config.toml'
+        self.models_dir = self.data_dir / 'models'
+        self.log_file = self.state_dir / 'blurt.log'
+        
         self._config = self._load_config()
     
     def _load_config(self) -> Dict[str, Any]:
@@ -24,6 +33,22 @@ class Config:
         else:
             return self._create_default_config()
     
+    def _get_xdg_config_dir(self) -> Path:
+        """Get XDG config directory."""
+        return Path(os.environ.get('XDG_CONFIG_HOME', Path.home() / '.config')) / 'blurt'
+    
+    def _get_xdg_data_dir(self) -> Path:
+        """Get XDG data directory."""
+        return Path(os.environ.get('XDG_DATA_HOME', Path.home() / '.local' / 'share')) / 'blurt'
+    
+    def _get_xdg_cache_dir(self) -> Path:
+        """Get XDG cache directory."""
+        return Path(os.environ.get('XDG_CACHE_HOME', Path.home() / '.cache')) / 'blurt'
+    
+    def _get_xdg_state_dir(self) -> Path:
+        """Get XDG state directory."""
+        return Path(os.environ.get('XDG_STATE_HOME', Path.home() / '.local' / 'state')) / 'blurt'
+    
     def _create_default_config(self) -> Dict[str, Any]:
         """Create default configuration."""
         config = {
@@ -34,19 +59,31 @@ class Config:
                 'channels': 1,
             },
             'model': {
-                'path': 'models/vosk-model-small-en-us-0.15',
+                'name': 'vosk-model-small-en-us-0.15',
+                'data_dir': str(self.data_dir),
+                'cache_dir': str(self.cache_dir),
+            },
+            'daemon': {
+                'log_file': str(self.log_file),
+                'log_level': 'info',
             },
             'output': {
                 'typing_delay': 0.01,
             }
         }
         
-        # Create config directory and file
-        self.config_dir.mkdir(parents=True, exist_ok=True)
+        # Create all necessary directories
+        for directory in [self.config_dir, self.data_dir, self.cache_dir, self.state_dir]:
+            directory.mkdir(parents=True, exist_ok=True)
+        
+        # Create config file
         with open(self.config_file, 'wb') as f:
             tomli_w.dump(config, f)
         
         print(f"Created default config at: {self.config_file}")
+        print(f"Data directory: {self.data_dir}")
+        print(f"Cache directory: {self.cache_dir}")
+        print(f"State directory: {self.state_dir}")
         return config
     
     @property
@@ -70,9 +107,20 @@ class Config:
         return self._config['audio']['channels']
     
     @property
-    def model_path(self) -> str:
-        """Vosk model path."""
-        return self._config['model']['path']
+    def model_path(self) -> Path:
+        """Full path to the Vosk model directory."""
+        model_name = self._config['model']['name']
+        return self.models_dir / model_name
+    
+    @property
+    def log_file_path(self) -> Path:
+        """Path to the log file."""
+        return Path(self._config['daemon']['log_file'])
+    
+    @property 
+    def log_level(self) -> str:
+        """Logging level."""
+        return self._config['daemon']['log_level']
     
     @property
     def typing_delay(self) -> float:
