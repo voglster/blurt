@@ -1,21 +1,111 @@
 # Blurt Development TODO
 
-## Phase 1: CLI & Process Management ✅ Started
+## Phase 1: Code Quality & Development Tools (PRIORITY)
 
-### 1.1 Basic CLI Structure ✅
+> **🚨 STOP: No new features until code quality is established!**
+> 
+> We need a solid foundation before continuing development. Quality first!
+
+## Phase 1.1: Code Quality & Development Tools (IMMEDIATE)
+
+### 1.1.1 Code Formatting & Linting
+- [ ] Add `ruff` for fast Python linting and formatting
+  - [ ] Configure `ruff.toml` or `pyproject.toml` rules
+  - [ ] Run `ruff check` and `ruff format` on codebase
+  - [ ] Fix all linting issues
+- [ ] Set up `pre-commit` hooks
+  - [ ] Install pre-commit framework
+  - [ ] Configure `.pre-commit-config.yaml`
+  - [ ] Include ruff, type checking, and other quality checks
+  - [ ] Test pre-commit hooks work locally
+
+### 1.1.2 Type Checking & Testing
+- [ ] Add comprehensive type hints throughout codebase
+  - [ ] Use `mypy` for static type checking
+  - [ ] Configure `mypy.ini` or `pyproject.toml` settings
+  - [ ] Fix all type errors
+- [ ] Set up testing framework
+  - [ ] Choose testing framework (pytest recommended)
+  - [ ] Write unit tests for core functionality
+  - [ ] Add integration tests for CLI commands
+  - [ ] Set up test coverage with `coverage.py`
+  - [ ] Aim for >80% code coverage
+
+### 1.1.3 Dead Code & Security
+- [ ] Use `vulture` to find dead/unused code
+  - [ ] Remove unused imports and functions
+  - [ ] Clean up any legacy code from tab_voice era
+- [ ] Security scanning
+  - [ ] Use `bandit` for security issue detection
+  - [ ] Fix any security warnings
+  - [ ] Review dependencies for known vulnerabilities
+
+### 1.1.4 Documentation & Code Quality
+- [ ] Add comprehensive docstrings
+  - [ ] All public functions and classes
+  - [ ] Follow Google or NumPy docstring style
+  - [ ] Use `pydocstyle` to enforce consistency
+- [ ] Code complexity analysis
+  - [ ] Use `radon` to check cyclomatic complexity
+  - [ ] Refactor overly complex functions
+- [ ] Import organization
+  - [ ] Use `isort` to organize imports consistently
+  - [ ] Configure to work with ruff
+
+### 1.1.5 Development Workflow
+- [ ] Create development scripts
+  - [ ] `scripts/lint.sh` - Run all linting tools
+  - [ ] `scripts/test.sh` - Run all tests with coverage
+  - [ ] `scripts/check.sh` - Full quality check before commit
+- [ ] Update `pyproject.toml` with dev dependencies:
+  ```toml
+  [project.optional-dependencies]
+  dev = [
+      "ruff>=0.1.0",
+      "mypy>=1.0.0",
+      "pytest>=7.0.0",
+      "coverage[toml]>=7.0.0",
+      "vulture>=2.0.0",
+      "bandit>=1.7.0",
+      "pre-commit>=3.0.0",
+      "pydocstyle>=6.0.0",
+      "radon>=6.0.0",
+      "isort>=5.0.0",
+  ]
+  ```
+
+### 1.1.6 CI/CD Quality Gates
+- [ ] GitHub Actions workflow for quality checks
+  - [ ] Run ruff, mypy, tests on every PR
+  - [ ] Block merges if quality checks fail
+  - [ ] Generate coverage reports
+- [ ] Add quality badges to README
+  - [ ] Build status, coverage %, PyPI version
+  - [ ] Code quality score if using external service
+
+### 1.1.7 Configuration Files to Add
+- [ ] `.pre-commit-config.yaml`
+- [ ] `mypy.ini` or mypy config in `pyproject.toml`
+- [ ] `ruff.toml` or ruff config in `pyproject.toml`
+- [ ] `.github/workflows/quality.yml`
+- [ ] Update `.gitignore` for development artifacts
+
+## Phase 2: CLI & Process Management (After Quality)
+
+### 2.1 Basic CLI Structure ✅
 - [x] Create `cli.py` with start/stop/restart/status/install commands
 - [x] Basic PID file management
 
-### 1.2 Daemon Mode 🔄
+### 2.2 Daemon Mode 🔄
 - [ ] Implement proper daemon process
   - [ ] Fork process and detach from terminal
   - [ ] Redirect stdout/stderr to log file
   - [ ] Handle signals properly (SIGTERM, SIGINT)
-- [ ] Log file in `~/.config/blurt/blurt.log`
+- [ ] Log file in `~/.local/state/blurt/blurt.log`
 - [ ] Rotate logs when they get too big
 - [ ] Add `--foreground` flag for debugging
 
-### 1.3 Process Management
+### 2.3 Process Management
 - [ ] Improve PID file handling
   - [ ] Lock file to prevent multiple instances
   - [ ] Check if PID actually belongs to blurt
@@ -25,7 +115,7 @@
   - [ ] Permission errors with solutions
 - [ ] Add `blurt logs` command to tail log file
 
-### 1.4 Directory Structure & Configuration
+### 2.4 Directory Structure & Configuration
 - [x] Move from `~/.config/tab_voice/` to `~/.config/blurt/`
 - [x] **Fix XDG Base Directory compliance**:
   - [x] Config: `~/.config/blurt/config.toml` ✅ 
@@ -50,93 +140,9 @@
   ```
 - [ ] Add `blurt config` command to show current config
 
-## Phase 1.5: Code Quality & Development Tools (Before Publishing)
+## Phase 3: Installation & Packaging
 
-### 1.5.1 Code Formatting & Linting
-- [ ] Add `ruff` for fast Python linting and formatting
-  - [ ] Configure `ruff.toml` or `pyproject.toml` rules
-  - [ ] Run `ruff check` and `ruff format` on codebase
-  - [ ] Fix all linting issues
-- [ ] Set up `pre-commit` hooks
-  - [ ] Install pre-commit framework
-  - [ ] Configure `.pre-commit-config.yaml`
-  - [ ] Include ruff, type checking, and other quality checks
-  - [ ] Test pre-commit hooks work locally
-
-### 1.5.2 Type Checking & Testing
-- [ ] Add comprehensive type hints throughout codebase
-  - [ ] Use `mypy` for static type checking
-  - [ ] Configure `mypy.ini` or `pyproject.toml` settings
-  - [ ] Fix all type errors
-- [ ] Set up testing framework
-  - [ ] Choose testing framework (pytest recommended)
-  - [ ] Write unit tests for core functionality
-  - [ ] Add integration tests for CLI commands
-  - [ ] Set up test coverage with `coverage.py`
-  - [ ] Aim for >80% code coverage
-
-### 1.5.3 Dead Code & Security
-- [ ] Use `vulture` to find dead/unused code
-  - [ ] Remove unused imports and functions
-  - [ ] Clean up any legacy code from tab_voice era
-- [ ] Security scanning
-  - [ ] Use `bandit` for security issue detection
-  - [ ] Fix any security warnings
-  - [ ] Review dependencies for known vulnerabilities
-
-### 1.5.4 Documentation & Code Quality
-- [ ] Add comprehensive docstrings
-  - [ ] All public functions and classes
-  - [ ] Follow Google or NumPy docstring style
-  - [ ] Use `pydocstyle` to enforce consistency
-- [ ] Code complexity analysis
-  - [ ] Use `radon` to check cyclomatic complexity
-  - [ ] Refactor overly complex functions
-- [ ] Import organization
-  - [ ] Use `isort` to organize imports consistently
-  - [ ] Configure to work with ruff
-
-### 1.5.5 Development Workflow
-- [ ] Create development scripts
-  - [ ] `scripts/lint.sh` - Run all linting tools
-  - [ ] `scripts/test.sh` - Run all tests with coverage
-  - [ ] `scripts/check.sh` - Full quality check before commit
-- [ ] Update `pyproject.toml` with dev dependencies:
-  ```toml
-  [project.optional-dependencies]
-  dev = [
-      "ruff>=0.1.0",
-      "mypy>=1.0.0",
-      "pytest>=7.0.0",
-      "coverage[toml]>=7.0.0",
-      "vulture>=2.0.0",
-      "bandit>=1.7.0",
-      "pre-commit>=3.0.0",
-      "pydocstyle>=6.0.0",
-      "radon>=6.0.0",
-      "isort>=5.0.0",
-  ]
-  ```
-
-### 1.5.6 CI/CD Quality Gates
-- [ ] GitHub Actions workflow for quality checks
-  - [ ] Run ruff, mypy, tests on every PR
-  - [ ] Block merges if quality checks fail
-  - [ ] Generate coverage reports
-- [ ] Add quality badges to README
-  - [ ] Build status, coverage %, PyPI version
-  - [ ] Code quality score if using external service
-
-### 1.5.7 Configuration Files to Add
-- [ ] `.pre-commit-config.yaml`
-- [ ] `mypy.ini` or mypy config in `pyproject.toml`
-- [ ] `ruff.toml` or ruff config in `pyproject.toml`
-- [ ] `.github/workflows/quality.yml`
-- [ ] Update `.gitignore` for development artifacts
-
-## Phase 2: Installation & Packaging
-
-### 2.1 Python Package Structure
+### 3.1 Python Package Structure
 - [ ] Create proper package structure:
   ```
   blurt/

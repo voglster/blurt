@@ -37,6 +37,68 @@ Homepage = "https://github.com/voglster/blurt"
 Repository = "https://github.com/voglster/blurt.git"
 Issues = "https://github.com/voglster/blurt/issues"
 
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.1.0",
+    "mypy>=1.0.0",
+    "pytest>=7.0.0",
+    "coverage[toml]>=7.0.0",
+    "vulture>=2.0.0",
+    "bandit>=1.7.0",
+    "pre-commit>=3.0.0",
+    "pydocstyle>=6.0.0",
+    "radon>=6.0.0",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "B",  # flake8-bugbear
+    "C4", # flake8-comprehensions
+    "UP", # pyupgrade
+]
+ignore = [
+    "E501", # line too long, handled by formatter
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["blurt"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
+check_untyped_defs = true
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "bandit>=1.8.3",
+    "coverage>=7.9.1",
+    "mypy>=1.16.0",
+    "pre-commit>=4.2.0",
+    "pydocstyle>=6.3.0",
+    "pytest>=8.4.0",
+    "radon>=6.0.1",
+    "ruff>=0.11.13",
+    "types-pynput>=1.8.1.20250318",
+    "types-python-xlib>=0.33.0.20250602",
+    "vulture>=2.14",
+]
