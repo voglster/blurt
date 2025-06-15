@@ -52,7 +52,7 @@ class SpeechRecognizer:
         self.config.cache_dir.mkdir(parents=True, exist_ok=True)
         zip_path = self.config.cache_dir / "vosk-model.zip"
 
-        urllib.request.urlretrieve(model_url, zip_path)
+        urllib.request.urlretrieve(model_url, zip_path)  # nosec B310 - trusted URL
 
         # Extract the model to data directory
         with zipfile.ZipFile(zip_path, "r") as zip_ref:

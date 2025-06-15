@@ -106,7 +106,6 @@ NoDisplay=false
             return None
 
 
-
 def main() -> None:
     """Main CLI entry point."""
 

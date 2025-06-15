@@ -83,6 +83,11 @@ warn_unused_configs = true
 disallow_untyped_defs = true
 ignore_missing_imports = true
 check_untyped_defs = true
+files = ["src/"]
+
+[tool.bandit]
+exclude_dirs = ["tests", ".venv"]
+skips = ["B101"]  # Skip assert_used test
 
 [build-system]
 requires = ["hatchling"]

@@ -3,7 +3,7 @@
 ## Phase 1: Code Quality & Development Tools (PRIORITY)
 
 > **🚨 STOP: No new features until code quality is established!**
-> 
+>
 > We need a solid foundation before continuing development. Quality first!
 
 ## Phase 1.1: Code Quality & Development Tools (IMMEDIATE)
@@ -118,9 +118,9 @@
 ### 2.4 Directory Structure & Configuration
 - [x] Move from `~/.config/tab_voice/` to `~/.config/blurt/`
 - [x] **Fix XDG Base Directory compliance**:
-  - [x] Config: `~/.config/blurt/config.toml` ✅ 
-  - [x] Data/Models: `~/.local/share/blurt/models/` 
-  - [x] Logs: `~/.local/state/blurt/blurt.log` 
+  - [x] Config: `~/.config/blurt/config.toml` ✅
+  - [x] Data/Models: `~/.local/share/blurt/models/`
+  - [x] Logs: `~/.local/state/blurt/blurt.log`
   - [x] Cache: `~/.cache/blurt/` (for temp downloads)
   - [x] Update model path resolution in config.py
   - [x] Updated speech_recognizer.py to use new paths
@@ -129,11 +129,11 @@
   ```toml
   [hotkeys]
   start_recording = "<ctrl>+<space>"
-  
+
   [daemon]
   log_level = "info"
   log_file = "~/.local/state/blurt/blurt.log"
-  
+
   [model]
   data_dir = "~/.local/share/blurt"
   cache_dir = "~/.cache/blurt"
@@ -172,7 +172,7 @@
   [build-system]
   requires = ["hatchling"]
   build-backend = "hatchling.build"
-  
+
   [project]
   name = "blurt"
   version = "0.1.0"
@@ -197,16 +197,16 @@
   requires-python = ">=3.12"
   dependencies = [
       "numpy>=2.3.0",
-      "pvrecorder>=1.2.7", 
+      "pvrecorder>=1.2.7",
       "pynput>=1.8.1",
       "python-xlib>=0.33",
       "tomli-w>=1.2.0",
       "vosk>=0.3.45",
   ]
-  
+
   [project.scripts]
   blurt = "blurt.cli:main"
-  
+
   [project.urls]
   Homepage = "https://github.com/voglster/blurt"
   Repository = "https://github.com/voglster/blurt.git"
@@ -255,7 +255,7 @@
   ```ini
   [distutils]
   index-servers = pypi
-  
+
   [pypi]
   username = __token__
   password = pypi-your-api-token-here
@@ -430,7 +430,7 @@ echo "✅ Released v$NEW_VERSION! GitHub Actions will handle PyPI upload."
 - [ ] Ultra-simple release commands:
   ```bash
   ./scripts/release.sh          # Patch: 0.1.0 → 0.1.1
-  ./scripts/release.sh minor    # Minor: 0.1.1 → 0.2.0  
+  ./scripts/release.sh minor    # Minor: 0.1.1 → 0.2.0
   ./scripts/release.sh major    # Major: 0.2.0 → 1.0.0
   ```
 - [ ] GitHub Actions handles the rest:
@@ -450,7 +450,7 @@ echo "✅ Released v$NEW_VERSION! GitHub Actions will handle PyPI upload."
 ./scripts/release.sh          # 0.1.0 → 0.1.1
 ./scripts/release.sh patch    # 0.1.1 → 0.1.2
 
-# New features (minor releases)  
+# New features (minor releases)
 ./scripts/release.sh minor    # 0.1.2 → 0.2.0
 
 # Breaking changes (major releases)
@@ -502,7 +502,7 @@ uv build
 # Upload to TestPyPI first
 UV_PUBLISH_TOKEN=your-test-token uv publish --publish-url https://test.pypi.org/legacy/
 
-# Test install from TestPyPI  
+# Test install from TestPyPI
 pip install --index-url https://test.pypi.org/simple/ blurt
 
 # One-liner releases (automated)

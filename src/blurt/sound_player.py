@@ -1,6 +1,6 @@
 """Simple sound player using system commands."""
 
-import subprocess
+import subprocess  # nosec B404 - needed for audio playback
 import threading
 from pathlib import Path
 
@@ -36,7 +36,7 @@ class SoundPlayer:
                 for player in players:
                     try:
                         # Use subprocess with devnull to suppress output
-                        subprocess.run(
+                        subprocess.run(  # nosec B603 - safe, no user input
                             [player, str(sound_file)],
                             stdout=subprocess.DEVNULL,
                             stderr=subprocess.DEVNULL,
@@ -51,7 +51,7 @@ class SoundPlayer:
                     ):
                         continue  # Try next player
 
-            except Exception:
+            except Exception:  # nosec B110 - graceful degradation
                 # Silently fail if no audio player works
                 pass
 

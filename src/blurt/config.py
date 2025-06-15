@@ -113,7 +113,6 @@ class Config:
         model_name = str(self._config["model"]["name"])
         return self.models_dir / model_name
 
-
     @property
     def log_level(self) -> str:
         """Logging level."""

@@ -46,7 +46,7 @@ class SimpleAudioRecorder:
                 print("Available audio devices:")
                 for i, device in enumerate(devices):
                     print(f"  [{i}] {device}")
-            except Exception:
+            except Exception:  # nosec B110 - graceful degradation
                 pass
 
     def _record_audio(self) -> None:
