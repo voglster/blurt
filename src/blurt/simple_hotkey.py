@@ -56,7 +56,6 @@ class SimpleHotkeyHandler:
                 print("🎯 Ctrl+Space detected! Starting recording...")
                 self.sound_player.play_start()  # Play start sound
                 self.is_recording = True
-                self.recording_started = True
                 threading.Thread(target=self._start_recording, daemon=True).start()
 
         except AttributeError:
@@ -71,7 +70,6 @@ class SimpleHotkeyHandler:
                 print("🎯 Ctrl released! Stopping recording...")
                 self.sound_player.play_stop()  # Play stop sound
                 self.is_recording = False
-                self.recording_started = False
                 self.ctrl_pressed = False
                 threading.Thread(target=self._stop_recording, daemon=True).start()
 

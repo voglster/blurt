@@ -5,7 +5,6 @@ import os
 import sys
 from typing import NoReturn
 
-from .audio_recorder import AudioRecorder
 from .config import Config
 from .simple_hotkey import SimpleHotkeyHandler
 from .speech_recognizer import SpeechRecognizer
@@ -19,7 +18,6 @@ class Blurt:
         self.config = Config()
         self.text_output = TextOutput(self.config)
         self.speech_recognizer = SpeechRecognizer(self.config)
-        self.audio_recorder = AudioRecorder(self.config)
         self.hotkey_handler = SimpleHotkeyHandler(self.config, self._on_voice_text)
 
     def _on_voice_text(self, audio_data: bytes) -> None:

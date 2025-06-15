@@ -105,9 +105,6 @@ NoDisplay=false
         except Exception:
             return None
 
-    def _write_pid(self) -> None:
-        """Write current PID to file."""
-        self.pid_file.write_text(str(os.getpid()))
 
 
 def main() -> None:

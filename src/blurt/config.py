@@ -113,10 +113,6 @@ class Config:
         model_name = str(self._config["model"]["name"])
         return self.models_dir / model_name
 
-    @property
-    def log_file_path(self) -> Path:
-        """Path to the log file."""
-        return Path(self._config["daemon"]["log_file"])
 
     @property
     def log_level(self) -> str:
