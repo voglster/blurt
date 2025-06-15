@@ -101,6 +101,7 @@ dev = [
     "pre-commit>=4.2.0",
     "pydocstyle>=6.3.0",
     "pytest>=8.4.0",
+    "pytest-cov>=6.2.1",
     "radon>=6.0.1",
     "ruff>=0.11.13",
     "types-pynput>=1.8.1.20250318",

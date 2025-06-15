@@ -6,7 +6,7 @@ import sys
 from typing import NoReturn
 
 from .config import Config
-from .simple_hotkey import SimpleHotkeyHandler
+from .hotkey_handler import HotkeyHandler
 from .speech_recognizer import SpeechRecognizer
 from .text_output import TextOutput
 
@@ -18,7 +18,7 @@ class Blurt:
         self.config = Config()
         self.text_output = TextOutput(self.config)
         self.speech_recognizer = SpeechRecognizer(self.config)
-        self.hotkey_handler = SimpleHotkeyHandler(self.config, self._on_voice_text)
+        self.hotkey_handler = HotkeyHandler(self.config, self._on_voice_text)
 
     def _on_voice_text(self, audio_data: bytes) -> None:
         """Handle voice text recognition."""
@@ -56,6 +56,24 @@ def main() -> None:
 
     app = Blurt()
     app.run()
+
+
+def main_daemon() -> None:
+    """Daemon entry point - runs without console output."""
+    import logging
+
+    # Check if we have X11 display
+    if not os.environ.get("DISPLAY"):
+        logging.error("No X11 display found - daemon cannot run")
+        sys.exit(1)
+
+    try:
+        app = Blurt()
+        logging.info("Starting Blurt application")
+        app.run()
+    except Exception as e:
+        logging.error(f"Application error: {e}")
+        raise
 
 
 if __name__ == "__main__":

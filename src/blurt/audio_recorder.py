@@ -1,4 +1,4 @@
-"""Audio recording using PvRecorder."""
+"""Synchronous audio recording."""
 
 import io
 import threading
@@ -11,7 +11,7 @@ from .config import Config
 
 
 class AudioRecorder:
-    """Audio recorder using PvRecorder."""
+    """Synchronous audio recorder."""
 
     def __init__(self, config: Config) -> None:
         self.config = config
@@ -20,12 +20,12 @@ class AudioRecorder:
         self.recorder: PvRecorder | None = None
         self.record_thread: threading.Thread | None = None
 
-    async def start_recording(self) -> None:
+    def start_recording(self) -> None:
         """Start audio recording."""
-        self.recording = []
-        self.is_recording = True
-
         try:
+            self.recording = []
+            self.is_recording = True
+
             # Create PvRecorder instance
             self.recorder = PvRecorder(
                 device_index=-1,  # Use default device
@@ -33,17 +33,21 @@ class AudioRecorder:
             )
 
             # Start recording in a separate thread
-            self.record_thread = threading.Thread(target=self._record_audio)
+            self.record_thread = threading.Thread(target=self._record_audio, daemon=True)
             self.record_thread.start()
 
+            print("✅ Audio recording started")
+
         except Exception as e:
-            print(f"Error starting recording: {e}")
+            print(f"❌ Error starting recording: {e}")
             # List available devices for debugging
-            devices = PvRecorder.get_audio_devices()
-            print("Available audio devices:")
-            for i, device in enumerate(devices):
-                print(f"  [{i}] {device}")
-            raise
+            try:
+                devices = PvRecorder.get_audio_devices()
+                print("Available audio devices:")
+                for i, device in enumerate(devices):
+                    print(f"  [{i}] {device}")
+            except Exception:  # nosec B110 - graceful degradation
+                pass
 
     def _record_audio(self) -> None:
         """Record audio in a separate thread."""
@@ -62,7 +66,7 @@ class AudioRecorder:
             if self.recorder:
                 self.recorder.stop()
 
-    async def stop_recording(self) -> bytes:
+    def stop_recording(self) -> bytes:
         """Stop recording and return audio data as bytes."""
         self.is_recording = False
 
@@ -76,18 +80,24 @@ class AudioRecorder:
             self.recorder = None
 
         if not self.recording:
+            print("⚠️ No audio data recorded")
             return b""
 
-        # Convert to numpy array and normalize
-        # PvRecorder returns 16-bit PCM data
-        audio_data = np.array(self.recording, dtype=np.int16)
+        print(f"✅ Recorded {len(self.recording)} audio samples")
 
-        # Create WAV file in memory
-        wav_buffer = io.BytesIO()
-        with wave.open(wav_buffer, "wb") as wav_file:
-            wav_file.setnchannels(self.config.channels)
-            wav_file.setsampwidth(2)  # 2 bytes for 16-bit
-            wav_file.setframerate(self.config.sample_rate)
-            wav_file.writeframes(audio_data.tobytes())
+        # Convert to numpy array and create WAV file
+        try:
+            audio_data = np.array(self.recording, dtype=np.int16)
 
-        return wav_buffer.getvalue()
+            # Create WAV file in memory
+            wav_buffer = io.BytesIO()
+            with wave.open(wav_buffer, "wb") as wav_file:
+                wav_file.setnchannels(self.config.channels)
+                wav_file.setsampwidth(2)  # 2 bytes for 16-bit
+                wav_file.setframerate(self.config.sample_rate)
+                wav_file.writeframes(audio_data.tobytes())
+
+            return wav_buffer.getvalue()
+        except Exception as e:
+            print(f"❌ Error creating WAV file: {e}")
+            return b""
