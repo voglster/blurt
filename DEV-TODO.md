@@ -39,6 +39,90 @@
   ```
 - [ ] Add `blurt config` command to show current config
 
+## Phase 1.5: Code Quality & Development Tools (Before Publishing)
+
+### 1.5.1 Code Formatting & Linting
+- [ ] Add `ruff` for fast Python linting and formatting
+  - [ ] Configure `ruff.toml` or `pyproject.toml` rules
+  - [ ] Run `ruff check` and `ruff format` on codebase
+  - [ ] Fix all linting issues
+- [ ] Set up `pre-commit` hooks
+  - [ ] Install pre-commit framework
+  - [ ] Configure `.pre-commit-config.yaml`
+  - [ ] Include ruff, type checking, and other quality checks
+  - [ ] Test pre-commit hooks work locally
+
+### 1.5.2 Type Checking & Testing
+- [ ] Add comprehensive type hints throughout codebase
+  - [ ] Use `mypy` for static type checking
+  - [ ] Configure `mypy.ini` or `pyproject.toml` settings
+  - [ ] Fix all type errors
+- [ ] Set up testing framework
+  - [ ] Choose testing framework (pytest recommended)
+  - [ ] Write unit tests for core functionality
+  - [ ] Add integration tests for CLI commands
+  - [ ] Set up test coverage with `coverage.py`
+  - [ ] Aim for >80% code coverage
+
+### 1.5.3 Dead Code & Security
+- [ ] Use `vulture` to find dead/unused code
+  - [ ] Remove unused imports and functions
+  - [ ] Clean up any legacy code from tab_voice era
+- [ ] Security scanning
+  - [ ] Use `bandit` for security issue detection
+  - [ ] Fix any security warnings
+  - [ ] Review dependencies for known vulnerabilities
+
+### 1.5.4 Documentation & Code Quality
+- [ ] Add comprehensive docstrings
+  - [ ] All public functions and classes
+  - [ ] Follow Google or NumPy docstring style
+  - [ ] Use `pydocstyle` to enforce consistency
+- [ ] Code complexity analysis
+  - [ ] Use `radon` to check cyclomatic complexity
+  - [ ] Refactor overly complex functions
+- [ ] Import organization
+  - [ ] Use `isort` to organize imports consistently
+  - [ ] Configure to work with ruff
+
+### 1.5.5 Development Workflow
+- [ ] Create development scripts
+  - [ ] `scripts/lint.sh` - Run all linting tools
+  - [ ] `scripts/test.sh` - Run all tests with coverage
+  - [ ] `scripts/check.sh` - Full quality check before commit
+- [ ] Update `pyproject.toml` with dev dependencies:
+  ```toml
+  [project.optional-dependencies]
+  dev = [
+      "ruff>=0.1.0",
+      "mypy>=1.0.0",
+      "pytest>=7.0.0",
+      "coverage[toml]>=7.0.0",
+      "vulture>=2.0.0",
+      "bandit>=1.7.0",
+      "pre-commit>=3.0.0",
+      "pydocstyle>=6.0.0",
+      "radon>=6.0.0",
+      "isort>=5.0.0",
+  ]
+  ```
+
+### 1.5.6 CI/CD Quality Gates
+- [ ] GitHub Actions workflow for quality checks
+  - [ ] Run ruff, mypy, tests on every PR
+  - [ ] Block merges if quality checks fail
+  - [ ] Generate coverage reports
+- [ ] Add quality badges to README
+  - [ ] Build status, coverage %, PyPI version
+  - [ ] Code quality score if using external service
+
+### 1.5.7 Configuration Files to Add
+- [ ] `.pre-commit-config.yaml`
+- [ ] `mypy.ini` or mypy config in `pyproject.toml`
+- [ ] `ruff.toml` or ruff config in `pyproject.toml`
+- [ ] `.github/workflows/quality.yml`
+- [ ] Update `.gitignore` for development artifacts
+
 ## Phase 2: Installation & Packaging
 
 ### 2.1 Python Package Structure
