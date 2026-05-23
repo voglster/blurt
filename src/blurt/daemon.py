@@ -126,6 +126,9 @@ class Daemon:
         log.info("session finish requested")
         self._state = State.FINALIZING
         self._set_tray(self._state)
+        # Capture the user's trailing audio (e.g. the last word still tailing off
+        # when they tap the hotkey) before tearing down pw-cat.
+        await asyncio.sleep(0.3)
         if self._audio is not None:
             await self._audio.stop()
             self._audio = None

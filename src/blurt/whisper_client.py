@@ -93,9 +93,10 @@ class WhisperLiveServer:
     of transcription via a quiet-gap timeout rather than END_OF_AUDIO.
     """
 
-    SILENCE_PADDING_SECONDS = 2.0
-    QUIET_GAP_SECONDS = 0.7
-    RECV_POLL_SECONDS = 0.25
+    SILENCE_PADDING_SECONDS = 1.5
+    QUIET_GAP_SECONDS = 0.5  # no text changes for this long after audio EOF → final
+    RECV_POLL_SECONDS = 0.15
+    NO_SEGMENTS_DEADLINE_SECONDS = 4.0
 
     def __init__(
         self,
@@ -158,11 +159,10 @@ class WhisperLiveServer:
                 audio_sent_done.set()
 
             loop = asyncio.get_running_loop()
-            last_segment_time = 0.0
+            last_text_change_time = 0.0
             last_text = ""
             last_segments: list[dict] = []
             audio_done_time: float | None = None
-            no_segments_deadline_s = 8.0
 
             try:
                 while True:
@@ -173,19 +173,16 @@ class WhisperLiveServer:
                     except asyncio.TimeoutError:
                         if audio_sent_done.is_set() and audio_done_time is None:
                             audio_done_time = loop.time()
-                        if audio_sent_done.is_set() and last_segment_time:
-                            if loop.time() - last_segment_time > WhisperLiveServer.QUIET_GAP_SECONDS:
-                                if last_segments:
-                                    final_text = " ".join(
-                                        s.get("text", "").strip() for s in last_segments
-                                    ).strip()
-                                    if final_text:
-                                        yield TranscriptEvent(text=final_text, is_final=True)
+                        # Text has settled → final. We compare against TEXT CHANGES, not
+                        # message arrival, because the server keeps re-sending the same
+                        # completed segments while idle.
+                        if audio_sent_done.is_set() and last_text:
+                            if loop.time() - last_text_change_time > WhisperLiveServer.QUIET_GAP_SECONDS:
+                                yield TranscriptEvent(text=last_text, is_final=True)
                                 break
-                        # If audio done but never saw any segments, give up after a long-ish wait
-                        # (CPU transcription of ~5s of audio can take 3-5s on this box).
-                        if audio_done_time is not None and not last_segment_time:
-                            if loop.time() - audio_done_time > no_segments_deadline_s:
+                        # Audio sent but transcription never produced anything.
+                        if audio_done_time is not None and not last_text:
+                            if loop.time() - audio_done_time > WhisperLiveServer.NO_SEGMENTS_DEADLINE_SECONDS:
                                 log.info("whisperlive: no segments after audio sent; closing")
                                 break
                         continue
@@ -215,10 +212,10 @@ class WhisperLiveServer:
                     if segments is None:
                         continue
                     last_segments = segments
-                    last_segment_time = loop.time()
                     text = " ".join(s.get("text", "").strip() for s in segments).strip()
                     if text and text != last_text:
                         last_text = text
+                        last_text_change_time = loop.time()
                         yield TranscriptEvent(text=text, is_final=False)
             finally:
                 if send_task is not None:
