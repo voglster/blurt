@@ -127,9 +127,16 @@ class WhisperLiveServer:
             send_task: asyncio.Task[None] | None = None
 
             async def send_audio() -> None:
+                # WhisperLive expects float32 audio in [-1, 1], not raw s16 PCM.
+                import struct
                 try:
                     async for chunk in audio_chunks:
-                        await ws.send(chunk)
+                        n = len(chunk) // 2
+                        if n == 0:
+                            continue
+                        samples = struct.unpack(f"<{n}h", chunk[: n * 2])
+                        f32 = struct.pack(f"<{n}f", *(s / 32768.0 for s in samples))
+                        await ws.send(f32)
                 except Exception as exc:
                     log.info("audio stream ended: %s", exc)
                 finally:
