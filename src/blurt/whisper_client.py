@@ -161,6 +161,8 @@ class WhisperLiveServer:
             last_segment_time = 0.0
             last_text = ""
             last_segments: list[dict] = []
+            audio_done_time: float | None = None
+            no_segments_deadline_s = 8.0
 
             try:
                 while True:
@@ -169,6 +171,8 @@ class WhisperLiveServer:
                             ws.recv(), timeout=WhisperLiveServer.RECV_POLL_SECONDS
                         )
                     except asyncio.TimeoutError:
+                        if audio_sent_done.is_set() and audio_done_time is None:
+                            audio_done_time = loop.time()
                         if audio_sent_done.is_set() and last_segment_time:
                             if loop.time() - last_segment_time > WhisperLiveServer.QUIET_GAP_SECONDS:
                                 if last_segments:
@@ -178,11 +182,10 @@ class WhisperLiveServer:
                                     if final_text:
                                         yield TranscriptEvent(text=final_text, is_final=True)
                                 break
-                        # If audio done but never saw any segments, give up after a bit.
-                        if audio_sent_done.is_set() and not last_segment_time:
-                            if not hasattr(self, "_first_done_t"):
-                                self._first_done_t = loop.time()
-                            if loop.time() - self._first_done_t > 2.0:
+                        # If audio done but never saw any segments, give up after a long-ish wait
+                        # (CPU transcription of ~5s of audio can take 3-5s on this box).
+                        if audio_done_time is not None and not last_segment_time:
+                            if loop.time() - audio_done_time > no_segments_deadline_s:
                                 log.info("whisperlive: no segments after audio sent; closing")
                                 break
                         continue
