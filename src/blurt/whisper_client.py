@@ -83,11 +83,19 @@ class WyomingServer:
 class WhisperLiveServer:
     """WhisperServer that streams to a Collabora WhisperLive instance over WebSocket.
 
-    Emits interim TranscriptEvents as segments update, then a final event
-    when the server signals it has flushed all segments.
+    Emits interim TranscriptEvents as segments update, then a final event when
+    no new segments arrive for ``QUIET_GAP_SECONDS`` after the audio source EOFs.
+
+    NOTE: WhisperLive's faster_whisper backend disconnects immediately on
+    END_OF_AUDIO without flushing, and its STT loop only processes audio when
+    >=1s is buffered. We therefore (a) send a few seconds of silence after the
+    real audio ends to push the buffer past the threshold, and (b) detect end
+    of transcription via a quiet-gap timeout rather than END_OF_AUDIO.
     """
 
-    END_OF_AUDIO = b"END_OF_AUDIO"
+    SILENCE_PADDING_SECONDS = 2.0
+    QUIET_GAP_SECONDS = 0.7
+    RECV_POLL_SECONDS = 0.25
 
     def __init__(
         self,
@@ -106,6 +114,8 @@ class WhisperLiveServer:
     async def stream(
         self, audio_chunks: AsyncIterator[bytes]
     ) -> AsyncIterator[TranscriptEvent]:
+        import struct
+
         from websockets.asyncio.client import connect
 
         uri = f"ws://{self._host}:{self._port}"
@@ -121,14 +131,12 @@ class WhisperLiveServer:
                 "send_last_n_segments": 10,
             }))
 
-            # Wait for SERVER_READY before streaming audio.
             ready = False
-            audio_sent_eof = False
+            audio_sent_done = asyncio.Event()
             send_task: asyncio.Task[None] | None = None
+            silence_chunk = struct.pack(f"<{1600}f", *([0.0] * 1600))  # 100ms
 
             async def send_audio() -> None:
-                # WhisperLive expects float32 audio in [-1, 1], not raw s16 PCM.
-                import struct
                 try:
                     async for chunk in audio_chunks:
                         n = len(chunk) // 2
@@ -139,17 +147,45 @@ class WhisperLiveServer:
                         await ws.send(f32)
                 except Exception as exc:
                     log.info("audio stream ended: %s", exc)
-                finally:
-                    try:
-                        await ws.send(WhisperLiveServer.END_OF_AUDIO)
-                    except Exception:
-                        pass
+                # Pad with silence to flush WhisperLive's >=1s buffer threshold.
+                try:
+                    n_silent = int(WhisperLiveServer.SILENCE_PADDING_SECONDS * 10)
+                    for _ in range(n_silent):
+                        await ws.send(silence_chunk)
+                        await asyncio.sleep(0.05)
+                except Exception:
+                    pass
+                audio_sent_done.set()
 
+            loop = asyncio.get_running_loop()
+            last_segment_time = 0.0
             last_text = ""
+            last_segments: list[dict] = []
+
             try:
                 while True:
                     try:
-                        raw = await ws.recv()
+                        raw = await asyncio.wait_for(
+                            ws.recv(), timeout=WhisperLiveServer.RECV_POLL_SECONDS
+                        )
+                    except asyncio.TimeoutError:
+                        if audio_sent_done.is_set() and last_segment_time:
+                            if loop.time() - last_segment_time > WhisperLiveServer.QUIET_GAP_SECONDS:
+                                if last_segments:
+                                    final_text = " ".join(
+                                        s.get("text", "").strip() for s in last_segments
+                                    ).strip()
+                                    if final_text:
+                                        yield TranscriptEvent(text=final_text, is_final=True)
+                                break
+                        # If audio done but never saw any segments, give up after a bit.
+                        if audio_sent_done.is_set() and not last_segment_time:
+                            if not hasattr(self, "_first_done_t"):
+                                self._first_done_t = loop.time()
+                            if loop.time() - self._first_done_t > 2.0:
+                                log.info("whisperlive: no segments after audio sent; closing")
+                                break
+                        continue
                     except Exception as exc:
                         log.info("whisperlive socket closed: %s", exc)
                         break
@@ -175,22 +211,12 @@ class WhisperLiveServer:
                     segments = msg.get("segments")
                     if segments is None:
                         continue
-
+                    last_segments = segments
+                    last_segment_time = loop.time()
                     text = " ".join(s.get("text", "").strip() for s in segments).strip()
-                    if not text:
-                        continue
-                    all_complete = all(s.get("completed") for s in segments)
-                    is_final = all_complete and audio_sent_eof
-
-                    if text != last_text or is_final:
+                    if text and text != last_text:
                         last_text = text
-                        yield TranscriptEvent(text=text, is_final=is_final)
-                        if is_final:
-                            break
-
-                    # Track whether audio sender has finished
-                    if send_task is not None and send_task.done() and not audio_sent_eof:
-                        audio_sent_eof = True
+                        yield TranscriptEvent(text=text, is_final=False)
             finally:
                 if send_task is not None:
                     send_task.cancel()
