@@ -7,8 +7,11 @@ from pathlib import Path
 
 @dataclass(frozen=True)
 class WhisperConfig:
+    backend: str = "wyoming"   # "wyoming" or "whisperlive"
     host: str = "llmbox"
     port: int = 10300
+    model: str = "small.en"    # whisperlive only
+    use_vad: bool = True       # whisperlive only
 
 
 @dataclass(frozen=True)

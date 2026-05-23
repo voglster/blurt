@@ -13,7 +13,7 @@ from blurt.corrections import load as load_corrections
 from blurt.hotkey import HotkeyListener
 from blurt.injector import Injector
 from blurt.tray import Tray, TrayState
-from blurt.whisper_client import WhisperSession, WyomingServer
+from blurt.whisper_client import WhisperLiveServer, WhisperSession, WyomingServer
 
 log = logging.getLogger(__name__)
 
@@ -34,10 +34,18 @@ class Daemon:
             model=self._cfg.cleanup.model,
             timeout_ms=self._cfg.cleanup.timeout_ms,
         )
-        self._whisper_server = WyomingServer(
-            host=self._cfg.whisper.host,
-            port=self._cfg.whisper.port,
-        )
+        if self._cfg.whisper.backend == "whisperlive":
+            self._whisper_server = WhisperLiveServer(
+                host=self._cfg.whisper.host,
+                port=self._cfg.whisper.port,
+                model=self._cfg.whisper.model,
+                use_vad=self._cfg.whisper.use_vad,
+            )
+        else:
+            self._whisper_server = WyomingServer(
+                host=self._cfg.whisper.host,
+                port=self._cfg.whisper.port,
+            )
         self._hotkey = HotkeyListener(
             keycode=self._cfg.hotkey.keycode,
             device_path=self._cfg.hotkey.device,
