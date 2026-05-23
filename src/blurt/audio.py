@@ -34,8 +34,6 @@ class AudioCapture:
         assert self._proc is not None and self._proc.stdout is not None
         while True:
             chunk = await self._proc.stdout.readexactly(CHUNK_BYTES)
-            if not chunk:
-                return
             yield chunk
 
     async def stop(self) -> None:

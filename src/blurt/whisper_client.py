@@ -35,20 +35,27 @@ class WyomingServer:
         from wyoming.asr import Transcribe, Transcript
         from wyoming.audio import AudioChunk, AudioStart, AudioStop
         from wyoming.client import AsyncTcpClient
+        import asyncio
+        import logging
+        log = logging.getLogger(__name__)
 
         async with AsyncTcpClient(self._host, self._port) as client:
             await client.write_event(Transcribe(language="en").event())
-            await client.write_event(
-                AudioStart(rate=16000, width=2, channels=1).event()
-            )
-            import asyncio
+            await client.write_event(AudioStart(rate=16000, width=2, channels=1).event())
 
             async def send_audio() -> None:
-                async for chunk in audio_chunks:
-                    await client.write_event(
-                        AudioChunk(rate=16000, width=2, channels=1, audio=chunk).event()
-                    )
-                await client.write_event(AudioStop().event())
+                try:
+                    async for chunk in audio_chunks:
+                        await client.write_event(
+                            AudioChunk(rate=16000, width=2, channels=1, audio=chunk).event()
+                        )
+                except Exception as exc:
+                    log.info("audio stream ended: %s", exc)
+                finally:
+                    try:
+                        await client.write_event(AudioStop().event())
+                    except Exception:
+                        pass
 
             send_task = asyncio.create_task(send_audio())
             try:
@@ -66,5 +73,5 @@ class WyomingServer:
                 send_task.cancel()
                 try:
                     await send_task
-                except asyncio.CancelledError:
+                except (asyncio.CancelledError, Exception):
                     pass

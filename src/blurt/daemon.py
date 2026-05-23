@@ -47,9 +47,14 @@ class Daemon:
         self._session_task: asyncio.Task[None] | None = None
         self._audio: AudioCapture | None = None
         self._stop_event = asyncio.Event()
+        self._loop: asyncio.AbstractEventLoop | None = None  # set in run()
 
     def _request_stop(self) -> None:
-        self._stop_event.set()
+        # May be called from tray thread OR signal handler (loop thread).
+        if self._loop is not None and self._loop.is_running():
+            self._loop.call_soon_threadsafe(self._stop_event.set)
+        else:
+            self._stop_event.set()
 
     def _set_tray(self, state: State) -> None:
         if self._tray is None:
@@ -94,8 +99,6 @@ class Daemon:
             self._set_tray(self._state)
             return
 
-        self._state = State.FINALIZING
-        self._set_tray(self._state)
         if self._cfg.cleanup.enabled and final_text:
             cleaned = await self._cleanup.cleanup(final_text)
             if cleaned and cleaned != final_text:
@@ -109,11 +112,15 @@ class Daemon:
         self._state = State.IDLE
         self._set_tray(self._state)
         self._injector.reset()
+        self._session_task = None
 
     async def _finish_session(self) -> None:
         log.info("session finish requested")
+        self._state = State.FINALIZING
+        self._set_tray(self._state)
         if self._audio is not None:
             await self._audio.stop()
+            self._audio = None
         if self._session_task is not None:
             await self._session_task
 
@@ -123,9 +130,9 @@ class Daemon:
             self._tray.start()
         self._set_tray(self._state)
 
-        loop = asyncio.get_running_loop()
+        self._loop = asyncio.get_running_loop()
         for sig in (signal.SIGINT, signal.SIGTERM):
-            loop.add_signal_handler(sig, self._request_stop)
+            self._loop.add_signal_handler(sig, self._request_stop)
 
         toggle_iter = self._hotkey.toggles()
         try:
@@ -146,6 +153,12 @@ class Daemon:
                     break
                 await self._on_toggle()
         finally:
+            if self._session_task is not None and not self._session_task.done():
+                self._session_task.cancel()
+                try:
+                    await self._session_task
+                except (asyncio.CancelledError, Exception):
+                    pass
             if self._audio is not None:
                 await self._audio.stop()
             await self._cleanup.aclose()
