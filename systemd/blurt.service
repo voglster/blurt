@@ -1,0 +1,15 @@
+[Unit]
+Description=blurt dictation daemon
+After=graphical-session.target sound.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/blurt run
+Restart=on-failure
+RestartSec=3
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+# Need access to /dev/input/* — user must be in 'input' group.
+
+[Install]
+WantedBy=graphical-session.target
