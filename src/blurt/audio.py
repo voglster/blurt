@@ -24,7 +24,6 @@ class AudioCapture:
             "--format=s16",
             "--rate=16000",
             "--channels=1",
-            "--raw",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.DEVNULL,
         )
@@ -40,11 +39,19 @@ class AudioCapture:
         if self._proc is None:
             return
         try:
-            self._proc.terminate()
-            await asyncio.wait_for(self._proc.wait(), timeout=1.0)
-        except asyncio.TimeoutError:
-            self._proc.kill()
-            await self._proc.wait()
+            if self._proc.returncode is None:
+                try:
+                    self._proc.terminate()
+                except ProcessLookupError:
+                    pass
+                try:
+                    await asyncio.wait_for(self._proc.wait(), timeout=1.0)
+                except asyncio.TimeoutError:
+                    try:
+                        self._proc.kill()
+                    except ProcessLookupError:
+                        pass
+                    await self._proc.wait()
         finally:
             log.info("audio capture stopped")
             self._proc = None
