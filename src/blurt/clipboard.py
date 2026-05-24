@@ -17,6 +17,8 @@ class SubprocessRunner:
             subprocess.run(args, input=stdin_bytes, check=False, timeout=2.0)
         except subprocess.TimeoutExpired:
             log.warning("xclip timed out")
+        except FileNotFoundError:
+            log.warning("xclip not found; clipboard copy skipped")
 
 
 def copy(text: str, runner: Runner | None = None) -> None:
