@@ -32,6 +32,8 @@ def _make_daemon_with_mocks() -> Daemon:
     d._target_window = None
     d._last_text = ""
     d._current_text = ""
+    d._session_error = None
+    d._notify_error = MagicMock()
     return d
 
 

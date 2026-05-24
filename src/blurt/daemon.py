@@ -21,6 +21,16 @@ from blurt.whisper_client import WhisperLiveServer, WhisperSession, WyomingServe
 log = logging.getLogger(__name__)
 
 
+def _notify(summary: str, body: str) -> None:
+    try:
+        subprocess.run(
+            ["notify-send", "-a", "blurt", summary, body],
+            check=False, timeout=1.0,
+        )
+    except (FileNotFoundError, subprocess.SubprocessError):
+        log.warning("notify-send unavailable")
+
+
 class State(Enum):
     IDLE = "idle"
     RECORDING = "recording"
@@ -90,6 +100,7 @@ class Daemon:
         self._type_at_window = type_at_window
         self._clipboard_copy = clipboard.copy
         self._get_active_window = _xdotool_get_active_window
+        self._notify_error = lambda msg: _notify("blurt: whisper error", msg)
 
         self._state = State.IDLE
         self._session_task: asyncio.Task[None] | None = None
@@ -101,6 +112,7 @@ class Daemon:
         self._current_text: str = ""
         self._paused: bool = False
         self._outcome: Outcome | None = None
+        self._session_error: Exception | None = None
 
     # --- callbacks (may be invoked from tray thread) ---
 
@@ -138,6 +150,7 @@ class Daemon:
         self._set_tray(self._state)
         self._target_window = self._get_active_window()
         self._current_text = ""
+        self._session_error = None
         self._outcome = None
         self._overlay.show()
         self._overlay.set_text("")
@@ -157,6 +170,7 @@ class Daemon:
                     break
         except Exception as exc:
             log.warning("session error: %s", exc)
+            self._session_error = exc
 
     async def _finalize(self, outcome: Outcome) -> None:
         """Terminal transition out of RECORDING. Always returns daemon to IDLE."""
@@ -175,6 +189,10 @@ class Daemon:
             except Exception as exc:
                 log.warning("session task failed during finalize: %s", exc)
             self._session_task = None
+
+        if self._session_error is not None:
+            self._notify_error(str(self._session_error))
+            self._session_error = None
 
         text = self._current_text
 
@@ -255,6 +273,7 @@ class Daemon:
                     await self._session_task
                 except (asyncio.CancelledError, Exception):
                     pass
+            self._hotkey.set_recording(False)
             if self._audio is not None:
                 await self._audio.stop()
             await self._cleanup.aclose()

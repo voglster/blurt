@@ -38,11 +38,15 @@ class Overlay:
     # --- lifecycle ---
 
     def start(self) -> None:
+        if not self._cfg.enabled:
+            return
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
         self._ready.wait(timeout=2.0)
 
     def stop(self) -> None:
+        if not self._cfg.enabled:
+            return
         root = self._root
         if root is not None:
             try:
@@ -55,16 +59,22 @@ class Overlay:
     # --- public (thread-safe) ---
 
     def show(self) -> None:
+        if not self._cfg.enabled:
+            return
         if self._root is None:
             return
         self._root.after(0, self._show_impl)
 
     def hide(self) -> None:
+        if not self._cfg.enabled:
+            return
         if self._root is None:
             return
         self._root.after(0, self._hide_impl)
 
     def set_text(self, text: str) -> None:
+        if not self._cfg.enabled:
+            return
         if self._root is None:
             self._pending_text = text
             return
