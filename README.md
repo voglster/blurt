@@ -1,13 +1,22 @@
 # blurt
 
-Fast personal Linux dictation. Tap the calc key, talk, tap the calc key, text appears in your focused window.
+Fast personal Linux dictation. Audio is captured locally and streamed to a remote Wyoming faster-whisper instance (typically `llmbox` over Tailscale). On finalization, the transcript runs through a fast Ollama model for capitalization, punctuation, and tech-term fixes (GitHub, kubectl, JSON, etc.) with a strict 500ms budget — if cleanup is slow or unreachable, you keep the raw whisper output.
 
-Audio is captured locally and streamed to a remote Wyoming faster-whisper instance (typically `llmbox` over Tailscale). On finalization, the transcript runs through a fast Ollama model for capitalization, punctuation, and tech-term fixes (GitHub, kubectl, JSON, etc.) with a strict 500ms budget — if cleanup is slow or unreachable, you keep the raw whisper output.
+## How it works
+
+Tap the dictate key (default: KEY_CALC). A small overlay window appears near the bottom of your screen and fills in with your live transcript as you talk. When you're done:
+
+- **Tap the dictate key again** or press **Enter** — the overlay closes and the text is typed into the window you were originally focused on.
+- **Press Esc** — the overlay closes and nothing is typed.
+- **Press C** — the overlay closes and the text is copied to the clipboard instead of typed.
+
+Right-click the tray icon for "Copy last transcript" (retrieves the last commit / copy / cancel), "Pause" (suspends the dictate hotkey), and "Quit".
 
 ## Requirements
 
 - X11 (not Wayland)
 - `xdotool`, `pw-cat` (PipeWire utils)
+- `xclip` (clipboard-copy feature: `sudo apt install xclip`)
 - Python 3.12+
 - User in the `input` group (for evdev key access)
 - Remote `llmbox` running:

@@ -1,5 +1,7 @@
 # blurt — Design Spec
 
+> **Status: SUPERSEDED** by `2026-05-23-blurt-v2-overlay-ux-design.md` on 2026-05-24. The live-into-cursor UX described here was replaced by the overlay UX before final adoption. Retained for historical context only.
+
 **Date:** 2026-05-23
 **Status:** Approved for planning
 **Author:** Matt (with Claude)
