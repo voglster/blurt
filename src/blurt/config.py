@@ -40,12 +40,30 @@ class TrayConfig:
 
 
 @dataclass(frozen=True)
+class OverlayConfig:
+    enabled: bool = True
+    position: str = "bottom-center"
+    width_fraction: float = 0.6
+    min_height_px: int = 120
+    max_height_fraction: float = 0.33
+    opacity: float = 0.85
+    font: str = "monospace 18"
+
+
+@dataclass(frozen=True)
+class ClipboardConfig:
+    tool: str = "xclip"
+
+
+@dataclass(frozen=True)
 class Config:
     whisper: WhisperConfig = field(default_factory=WhisperConfig)
     cleanup: CleanupConfig = field(default_factory=CleanupConfig)
     hotkey: HotkeyConfig = field(default_factory=HotkeyConfig)
     corrections: CorrectionsConfig = field(default_factory=CorrectionsConfig)
     tray: TrayConfig = field(default_factory=TrayConfig)
+    overlay: OverlayConfig = field(default_factory=OverlayConfig)
+    clipboard: ClipboardConfig = field(default_factory=ClipboardConfig)
 
 
 DEFAULT_PATH = Path.home() / ".config" / "blurt" / "config.toml"
@@ -63,4 +81,6 @@ def load(path: Path | None = None) -> Config:
         hotkey=HotkeyConfig(**data.get("hotkey", {})),
         corrections=CorrectionsConfig(**data.get("corrections", {})),
         tray=TrayConfig(**data.get("tray", {})),
+        overlay=OverlayConfig(**data.get("overlay", {})),
+        clipboard=ClipboardConfig(**data.get("clipboard", {})),
     )
