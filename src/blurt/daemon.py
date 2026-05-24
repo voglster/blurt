@@ -3,15 +3,18 @@ from __future__ import annotations
 import asyncio
 import logging
 import signal
+import subprocess
 from enum import Enum
 from pathlib import Path
 
+from blurt import clipboard
 from blurt.audio import AudioCapture
 from blurt.cleanup_client import CleanupClient
 from blurt.config import load as load_config
 from blurt.corrections import load as load_corrections
-from blurt.hotkey import HotkeyListener
-from blurt.injector import Injector
+from blurt.hotkey import HotkeyListener, KeyEvent
+from blurt.injector import type_at_window
+from blurt.overlay import Overlay, OverlayConfig
 from blurt.tray import Tray, TrayState
 from blurt.whisper_client import WhisperLiveServer, WhisperSession, WyomingServer
 
@@ -24,11 +27,28 @@ class State(Enum):
     FINALIZING = "finalizing"
 
 
+class Outcome(Enum):
+    COMMIT = "commit"
+    COPY = "copy"
+    CANCEL = "cancel"
+
+
+def _xdotool_get_active_window() -> int | None:
+    try:
+        out = subprocess.run(
+            ["xdotool", "getactivewindow"],
+            capture_output=True, text=True, check=True, timeout=1.0,
+        )
+        return int(out.stdout.strip())
+    except (subprocess.SubprocessError, ValueError) as exc:
+        log.warning("getactivewindow failed: %s", exc)
+        return None
+
+
 class Daemon:
     def __init__(self) -> None:
         self._cfg = load_config()
         self._corrections = load_corrections(Path(self._cfg.corrections.file).expanduser())
-        self._injector = Injector()
         self._cleanup = CleanupClient(
             base_url=f"http://{self._cfg.cleanup.host}:{self._cfg.cleanup.port}",
             model=self._cfg.cleanup.model,
@@ -50,19 +70,55 @@ class Daemon:
             keycode=self._cfg.hotkey.keycode,
             device_path=self._cfg.hotkey.device,
         )
-        self._tray = Tray(on_quit=self._request_stop) if self._cfg.tray.enabled else None
+        self._overlay = Overlay(OverlayConfig(
+            enabled=self._cfg.overlay.enabled,
+            position=self._cfg.overlay.position,
+            width_fraction=self._cfg.overlay.width_fraction,
+            min_height_px=self._cfg.overlay.min_height_px,
+            max_height_fraction=self._cfg.overlay.max_height_fraction,
+            opacity=self._cfg.overlay.opacity,
+            font=self._cfg.overlay.font,
+        ))
+        self._tray = (
+            Tray(
+                on_quit=self._request_stop,
+                on_copy_last=self._on_copy_last,
+                on_toggle_pause=self._on_toggle_pause,
+            )
+            if self._cfg.tray.enabled else None
+        )
+        self._type_at_window = type_at_window
+        self._clipboard_copy = clipboard.copy
+        self._get_active_window = _xdotool_get_active_window
+
         self._state = State.IDLE
         self._session_task: asyncio.Task[None] | None = None
         self._audio: AudioCapture | None = None
         self._stop_event = asyncio.Event()
-        self._loop: asyncio.AbstractEventLoop | None = None  # set in run()
+        self._loop: asyncio.AbstractEventLoop | None = None
+        self._target_window: int | None = None
+        self._last_text: str = ""
+        self._current_text: str = ""
+        self._paused: bool = False
+        self._outcome: Outcome | None = None
+
+    # --- callbacks (may be invoked from tray thread) ---
 
     def _request_stop(self) -> None:
-        # May be called from tray thread OR signal handler (loop thread).
         if self._loop is not None and self._loop.is_running():
             self._loop.call_soon_threadsafe(self._stop_event.set)
         else:
             self._stop_event.set()
+
+    def _on_copy_last(self) -> None:
+        if self._last_text:
+            self._clipboard_copy(self._last_text)
+
+    def _on_toggle_pause(self) -> None:
+        self._paused = not self._paused
+        self._hotkey.set_paused(self._paused)
+        if self._tray is not None:
+            self._tray.set_paused(self._paused)
 
     def _set_tray(self, state: State) -> None:
         if self._tray is None:
@@ -74,19 +130,18 @@ class Daemon:
         }
         self._tray.set_state(mapping[state])
 
-    async def _on_toggle(self) -> None:
-        if self._state == State.IDLE:
-            await self._start_session()
-        elif self._state == State.RECORDING:
-            await self._finish_session()
-        else:
-            log.info("toggle ignored in state=%s", self._state)
+    # --- session ---
 
     async def _start_session(self) -> None:
         log.info("session start")
         self._state = State.RECORDING
         self._set_tray(self._state)
-        self._injector.reset()
+        self._target_window = self._get_active_window()
+        self._current_text = ""
+        self._outcome = None
+        self._overlay.show()
+        self._overlay.set_text("")
+        self._hotkey.set_recording(True)
         self._audio = AudioCapture()
         await self._audio.start()
         self._session_task = asyncio.create_task(self._run_session())
@@ -94,49 +149,79 @@ class Daemon:
     async def _run_session(self) -> None:
         assert self._audio is not None
         session = WhisperSession(server=self._whisper_server)
-        final_text = ""
         try:
             async for event in session.run(self._audio.chunks()):
-                self._injector.commit(event.text)
+                self._current_text = event.text
+                self._overlay.set_text(event.text)
                 if event.is_final:
-                    final_text = event.text
                     break
         except Exception as exc:
             log.warning("session error: %s", exc)
-            self._state = State.IDLE
-            self._set_tray(self._state)
-            return
 
-        if self._cfg.cleanup.enabled and final_text:
-            cleaned = await self._cleanup.cleanup(final_text)
-            if cleaned and cleaned != final_text:
-                self._injector.commit(cleaned)
-                final_text = cleaned
-
-        corrected = self._corrections.apply(final_text)
-        if corrected != final_text:
-            self._injector.commit(corrected)
-
-        self._state = State.IDLE
-        self._set_tray(self._state)
-        self._injector.reset()
-        self._session_task = None
-
-    async def _finish_session(self) -> None:
-        log.info("session finish requested")
+    async def _finalize(self, outcome: Outcome) -> None:
+        """Terminal transition out of RECORDING. Always returns daemon to IDLE."""
+        log.info("finalize outcome=%s", outcome)
         self._state = State.FINALIZING
         self._set_tray(self._state)
-        # Capture the user's trailing audio (e.g. the last word still tailing off
-        # when they tap the hotkey) before tearing down pw-cat.
+
+        # Let trailing audio reach whisper before we tear down.
         await asyncio.sleep(0.3)
         if self._audio is not None:
             await self._audio.stop()
             self._audio = None
         if self._session_task is not None:
-            await self._session_task
+            try:
+                await self._session_task
+            except Exception as exc:
+                log.warning("session task failed during finalize: %s", exc)
+            self._session_task = None
+
+        text = self._current_text
+
+        # Cleanup + corrections only apply on COMMIT and COPY (not CANCEL).
+        if outcome in (Outcome.COMMIT, Outcome.COPY) and text:
+            if self._cfg.cleanup.enabled:
+                cleaned = await self._cleanup.cleanup(text)
+                if cleaned:
+                    text = cleaned
+            text = self._corrections.apply(text)
+
+        self._overlay.hide()
+        self._hotkey.set_recording(False)
+
+        if outcome == Outcome.COMMIT:
+            self._type_at_window(self._target_window, text)
+        elif outcome == Outcome.COPY:
+            self._clipboard_copy(text)
+        # CANCEL: do nothing.
+
+        self._last_text = text
+        self._state = State.IDLE
+        self._set_tray(self._state)
+        self._target_window = None
+
+    async def _handle_key(self, ke: KeyEvent) -> None:
+        if self._state == State.IDLE:
+            if ke == KeyEvent.TOGGLE:
+                await self._start_session()
+            return
+
+        if self._state == State.RECORDING:
+            if ke in (KeyEvent.TOGGLE, KeyEvent.COMMIT):
+                await self._finalize(Outcome.COMMIT)
+            elif ke == KeyEvent.COPY:
+                await self._finalize(Outcome.COPY)
+            elif ke == KeyEvent.CANCEL:
+                await self._finalize(Outcome.CANCEL)
+            return
+
+        log.info("key %s ignored in state=%s", ke, self._state)
+
+    # --- main loop ---
 
     async def run(self) -> int:
         logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+        self._overlay.start()
         if self._tray is not None:
             self._tray.start()
         self._set_tray(self._state)
@@ -145,13 +230,13 @@ class Daemon:
         for sig in (signal.SIGINT, signal.SIGTERM):
             self._loop.add_signal_handler(sig, self._request_stop)
 
-        toggle_iter = self._hotkey.toggles()
+        events = self._hotkey.events()
         try:
             while not self._stop_event.is_set():
-                next_toggle = asyncio.create_task(toggle_iter.__anext__())
+                next_event = asyncio.create_task(events.__anext__())
                 stop_task = asyncio.create_task(self._stop_event.wait())
                 done, pending = await asyncio.wait(
-                    {next_toggle, stop_task},
+                    {next_event, stop_task},
                     return_when=asyncio.FIRST_COMPLETED,
                 )
                 for p in pending:
@@ -159,10 +244,10 @@ class Daemon:
                 if stop_task in done:
                     break
                 try:
-                    next_toggle.result()
+                    ke = next_event.result()
                 except StopAsyncIteration:
                     break
-                await self._on_toggle()
+                await self._handle_key(ke)
         finally:
             if self._session_task is not None and not self._session_task.done():
                 self._session_task.cancel()
@@ -173,6 +258,7 @@ class Daemon:
             if self._audio is not None:
                 await self._audio.stop()
             await self._cleanup.aclose()
+            self._overlay.stop()
             if self._tray is not None:
                 self._tray.stop()
         return 0
