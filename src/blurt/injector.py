@@ -1,22 +1,8 @@
 from __future__ import annotations
 
 import subprocess
+import time
 from typing import Protocol
-
-
-def diff(last_typed: str, candidate: str) -> tuple[int, str]:
-    """Compute the keystroke delta from `last_typed` to `candidate`.
-
-    Returns (n_backspaces, tail_to_type).
-    """
-    # Longest common prefix
-    i = 0
-    n = min(len(last_typed), len(candidate))
-    while i < n and last_typed[i] == candidate[i]:
-        i += 1
-    n_backspaces = len(last_typed) - i
-    tail = candidate[i:]
-    return n_backspaces, tail
 
 
 class Runner(Protocol):
@@ -28,23 +14,22 @@ class SubprocessRunner:
         subprocess.run(args, check=False)
 
 
-class Injector:
-    def __init__(self, runner: Runner | None = None) -> None:
-        self._runner = runner or SubprocessRunner()
-        self.last_typed: str = ""
+def type_at_window(
+    window_id: int | None,
+    text: str,
+    runner: Runner | None = None,
+    settle_ms: int = 30,
+) -> None:
+    """Restore focus to `window_id` (if given) and type `text` via xdotool.
 
-    def commit(self, candidate: str) -> None:
-        n_back, tail = diff(self.last_typed, candidate)
-        if n_back:
-            self._runner.run([
-                "xdotool", "key", "--clearmodifiers", "--delay", "0",
-                "--repeat", str(n_back), "BackSpace",
-            ])
-        if tail:
-            self._runner.run([
-                "xdotool", "type", "--clearmodifiers", "--delay", "0", tail,
-            ])
-        self.last_typed = candidate
-
-    def reset(self) -> None:
-        self.last_typed = ""
+    One-shot: no diff, no backspaces. The overlay UX guarantees the caller
+    only invokes this on commit, after the user has visually verified the text.
+    """
+    if not text:
+        return
+    runner = runner or SubprocessRunner()
+    if window_id is not None:
+        runner.run(["xdotool", "windowactivate", "--sync", str(window_id)])
+        if settle_ms > 0:
+            time.sleep(settle_ms / 1000.0)
+    runner.run(["xdotool", "type", "--clearmodifiers", "--delay", "0", text])
