@@ -1,7 +1,7 @@
 # blurt v2 — Overlay UX Redesign
 
-**Date:** 2026-05-23
-**Status:** Approved — open questions resolved 2026-05-23 (replaces the live-into-cursor approach from v1)
+**Date:** 2026-05-23 (decisions locked 2026-05-24)
+**Status:** Approved — open questions resolved; ready for plan
 **Predecessor spec:** `2026-05-23-blurt-design.md`
 
 ## Why v2
@@ -42,7 +42,7 @@ The v2 model: live transcript appears in a frameless overlay window while you sp
 - The `injector` state machine inside the daemon (no `last_typed`, no `reset`).
 - The streaming `commit()` calls in `_run_session`.
 
-What stays: the `injector` module survives, but reduced to a single function `type_at_window(window_id, text)`. Clipboard handling moves out to its own `clipboard.py` module (see Refined architecture).
+What stays: the `Injector` *concept* gets simplified to a one-shot `inject_text(text)` and `copy_text(text)` pair.
 
 ## What gets added
 
@@ -118,15 +118,16 @@ Still useful for the overlay — you see text appearing as you talk, which is th
 ```toml
 [overlay]
 enabled = true
-position = "bottom-center"     # fixed in v2
-width_fraction = 0.6           # of screen width
-min_height_px = 120            # starting height
-max_height_px = 0              # 0 = derive from screen (≈ screen_h / 3); scroll once exceeded
+position = "bottom-center"      # only supported value initially
+width_fraction = 0.6            # of screen width
+min_height_px = 120             # starting height before content forces growth
+max_height_fraction = 0.33      # of screen height; beyond this, overlay scrolls
 opacity = 0.85
 font = "monospace 18"
-```
 
-Clipboard tool is hardcoded to `xclip -selection clipboard` in v2; no config knob.
+[clipboard]
+tool = "xclip"                  # only supported value initially
+```
 
 ## Dependencies
 
@@ -147,53 +148,24 @@ Already present: `xdotool`, `evdev`, `pystray`, `pillow`.
 8. Delete `test_injector_diff.py` and `test_injector_driver.py`. Add tests for the new state transitions and clipboard glue.
 9. Update README + the v1 spec → mark superseded.
 
-## Resolved design decisions (from 2026-05-23 brainstorm)
+## Resolved brainstorm decisions
 
-| Question | Decision |
-|---|---|
-| Overlay content | **Current utterance only.** Overlay text is cleared at the start of every session. |
-| Overlay position | **Fixed bottom-center.** No cursor-follow in v2. |
-| Long-dictation overflow | **Auto-grow vertically up to a cap (~screen_h / 3), then scroll the tail.** Scrollable Text widget pinned to bottom once cap is hit. |
-| Interim vs settled styling | **No visual distinction.** All transcript text is rendered the same; whisper rewrites in place are just text changes. |
-| Clipboard tool | **Plain `xclip`** (writes to `CLIPBOARD` selection). No greenclip or other clipboard-manager integration. |
-| Tray "Copy last" | **Single most-recent transcript only.** Daemon keeps a single `_last_text` field; no submenu. |
-| Pause semantics | **Soft pause.** Hotkey listener keeps running but ignores `KEY_CALC` while paused. |
-| `_last_text` update on CANCEL | **Updated on CANCEL too** — so the tray "Copy last" can rescue an abandoned transcript. |
+These were the open questions; all are now settled.
 
-## Refined architecture
+| # | Question | Decision |
+|---|---|---|
+| 1 | Overlay content model | **Current utterance only.** Cleared at the start of each session; no cross-session history rendered in the overlay. |
+| 2 | Overlay position | **Fixed bottom-center.** No cursor-following. Configurable via `[overlay].position` later. |
+| 3 | Long-dictation overflow | **Auto-grow then scroll.** Overlay grows vertically up to `max_height_px` (default ≈ screen_h / 3), then switches to a scrolling Text widget pinned to the latest line. |
+| 4 | Interim vs settled styling | **No distinction.** All text rendered identically; whisper rewrites in place. |
+| 5 | "C → copy" clipboard integration | **Plain `xclip` only.** Writes to `clipboard` selection. No greenclip or clipboard-manager-specific code. `[clipboard].tool` stays configurable but `xclip` is the only supported value initially. |
+| 6 | Tray "Copy last transcript" history depth | **Just the most recent transcript.** Daemon keeps a single `_last_text`; no ring buffer, no submenu. |
 
-Five modules, each with one responsibility:
+Implementation-level confirmations from the same session:
 
-1. **`overlay.py`** — Tk window in its own thread. Public API: `show()`, `set_text(str)`, `hide()`. No keyboard handling (all input goes through the existing evdev path). Auto-grows by reflowing/wrapping; once height hits `overlay.max_height_px` (default ≈ screen_h / 3), switches to a scrolling Text widget pinned to the bottom.
-2. **`hotkey.py`** — emits a `KeyEvent` enum (`TOGGLE`, `COMMIT`, `CANCEL`, `COPY`). Calls `dev.grab()` on entry to RECORDING (so `c` / `Enter` / `Esc` are consumed before reaching the focused app) and `dev.ungrab()` on return to IDLE. Honors a `paused` flag that suppresses `TOGGLE`.
-3. **`clipboard.py`** (new, ~20 lines) — `copy(text)` shells out to `xclip -selection clipboard`. Tool is *not* configurable in v2; if Wayland support arrives later, this is where the seam is.
-4. **`injector.py`** — gutted. Old `Injector` class + `diff()` function deleted along with `last_typed`/`reset`/`commit` state. Replaced with one pure function: `type_at_window(window_id: int, text: str)` doing `xdotool windowactivate` → small settle delay → `xdotool type --clearmodifiers --delay 0`.
-5. **`daemon.py`** — new state machine: `IDLE → RECORDING → {COMMIT | COPY | CANCEL} → IDLE`. Holds `_target_window` (captured at session start) and `_last_text` (updated on every terminal transition, including CANCEL).
-
-### Data flow during a session
-
-```
-calc tap → daemon captures _target_window, starts WhisperLive stream,
-           shows overlay, transitions IDLE → RECORDING
-audio    → WhisperLive partials → daemon → overlay.set_text(partial)
-key      → hotkey emits COMMIT/CANCEL/COPY → daemon dispatches:
-           COMMIT  → overlay.hide(); type_at_window(target, text); _last_text=text
-           COPY    → overlay.hide(); clipboard.copy(text);        _last_text=text
-           CANCEL  → overlay.hide();                              _last_text=text
-         → daemon returns to IDLE; hotkey ungrabs C/Esc/Enter
-```
-
-### Testing strategy
-
-- `clipboard.py`: unit test mocking `subprocess`; verify pipe and selection flag.
-- Daemon state machine: parametrized test driving fake key events through each transition, asserting overlay/clipboard/inject calls.
-- `overlay.py`: smoke test that creates and destroys window (skip on headless / no `$DISPLAY`).
-- Manual: golden-path commit, copy, cancel; long-dictation overflow; focus-restoration into a terminal and into a browser; verify `c` keypress during recording does not leak to the focused app.
-
-### Risks
-
-- **Evdev grab on `C` / `Enter` / `Esc`**: implementation must verify keystrokes don't leak to the focused app during RECORDING. Plan: explicit `dev.grab()` at RECORDING entry, `dev.ungrab()` on exit. Manual test required.
-- **Tk on GNOME/X11 frameless behavior**: `overrideredirect(True) + -topmost` is the primary path; fallback `wm_attributes("-type", "splash")` if the WM misbehaves. PyQt6 is documented as a last-resort fallback but is not added as a dependency in v2.
+- **Pause** is a soft pause: hotkey listener keeps running but ignores calc taps while paused. Tray menu toggles it.
+- `_last_text` is updated on **all** session terminations (commit, copy, *and* cancel), so a cancelled dictation can still be retrieved via tray.
+- Evdev grab of `KEY_C` / `KEY_ENTER` / `KEY_ESC` is explicit: `dev.grab()` on entering RECORDING, `dev.ungrab()` on returning to IDLE. Must be verified during implementation by recording, pressing `c`, and confirming the focused app receives no `c` keystroke.
 
 ## Migration
 
