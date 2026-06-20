@@ -43,10 +43,39 @@ async def test_commit_types_at_captured_window() -> None:
     d._current_text = "hello"
     d._target_window = 42
     await d._finalize(Outcome.COMMIT)
-    d._type_at_window.assert_called_once_with(42, "hello")
+    d._type_at_window.assert_called_once_with(42, "hello", append_return=False)
     d._clipboard_copy.assert_not_called()
     assert d._last_text == "hello"
     assert d._state == State.IDLE
+
+
+@pytest.mark.asyncio
+async def test_commit_with_return_appends_enter() -> None:
+    d = _make_daemon_with_mocks()
+    d._current_text = "hello"
+    d._target_window = 42
+    await d._finalize(Outcome.COMMIT, with_return=True)
+    d._type_at_window.assert_called_once_with(42, "hello", append_return=True)
+
+
+@pytest.mark.asyncio
+async def test_handle_key_routes_commit_with_return_for_enter() -> None:
+    d = _make_daemon_with_mocks()
+    d._state = State.RECORDING
+    d._current_text = "x"
+    d._target_window = 42
+    await d._handle_key(KeyEvent.COMMIT)
+    d._type_at_window.assert_called_once_with(42, "x", append_return=True)
+
+
+@pytest.mark.asyncio
+async def test_handle_key_routes_commit_without_return_for_toggle() -> None:
+    d = _make_daemon_with_mocks()
+    d._state = State.RECORDING
+    d._current_text = "x"
+    d._target_window = 42
+    await d._handle_key(KeyEvent.TOGGLE)
+    d._type_at_window.assert_called_once_with(42, "x", append_return=False)
 
 
 @pytest.mark.asyncio

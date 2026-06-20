@@ -181,12 +181,15 @@ class Daemon:
         if self._state == State.RECORDING:
             await self._finalize(Outcome.CANCEL)
 
-    async def _finalize(self, outcome: Outcome) -> None:
+    async def _finalize(self, outcome: Outcome, with_return: bool = False) -> None:
         """Terminal transition out of RECORDING. Always returns daemon to IDLE.
 
         Fast-path: snapshot whatever the overlay was showing and act on that
         immediately. We do NOT wait for WhisperLive's "official final" — the
         user already accepted the displayed text by pressing commit.
+
+        `with_return` appends an Enter keystroke after typing, used when the
+        user committed via Enter (matches "Enter = submit" expectation).
         """
         import time as _time
         t0 = _time.monotonic()
@@ -232,7 +235,7 @@ class Daemon:
         # Enter right after the typed text. Holding the grab through the type
         # call ensures any lingering events are absorbed.
         if outcome == Outcome.COMMIT:
-            self._type_at_window(self._target_window, text)
+            self._type_at_window(self._target_window, text, append_return=with_return)
             _ms("typed")
         elif outcome == Outcome.COPY:
             self._clipboard_copy(text)
@@ -255,8 +258,10 @@ class Daemon:
             return
 
         if self._state == State.RECORDING:
-            if ke in (KeyEvent.TOGGLE, KeyEvent.COMMIT):
-                await self._finalize(Outcome.COMMIT)
+            if ke == KeyEvent.TOGGLE:
+                await self._finalize(Outcome.COMMIT, with_return=False)
+            elif ke == KeyEvent.COMMIT:
+                await self._finalize(Outcome.COMMIT, with_return=True)
             elif ke == KeyEvent.COPY:
                 await self._finalize(Outcome.COPY)
             elif ke == KeyEvent.CANCEL:

@@ -30,3 +30,22 @@ def test_type_at_window_without_window_id_just_types() -> None:
     assert runner.calls == [
         ["xdotool", "type", "--clearmodifiers", "--delay", "0", "hi"],
     ]
+
+
+def test_type_at_window_append_return_adds_return_keystroke() -> None:
+    runner = FakeRunner()
+    type_at_window(42, "hello", runner=runner, settle_ms=0, append_return=True)
+    assert runner.calls == [
+        ["xdotool", "windowactivate", "--sync", "42"],
+        ["xdotool", "type", "--clearmodifiers", "--delay", "0", "hello"],
+        ["xdotool", "key", "--clearmodifiers", "Return"],
+    ]
+
+
+def test_type_at_window_append_return_with_empty_text_still_presses_return() -> None:
+    runner = FakeRunner()
+    type_at_window(42, "", runner=runner, settle_ms=0, append_return=True)
+    assert runner.calls == [
+        ["xdotool", "windowactivate", "--sync", "42"],
+        ["xdotool", "key", "--clearmodifiers", "Return"],
+    ]
