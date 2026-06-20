@@ -52,15 +52,18 @@ class HotkeyListener:
     def set_recording(self, value: bool) -> None:
         self._recording = value
         if self._dev is None:
+            log.info("set_recording(%s) called before device opened — no grab", value)
             return
         if value:
             try:
                 self._dev.grab()
+                log.info("dev.grab() ok on %s", getattr(self._dev, "path", "?"))
             except Exception as exc:
                 log.warning("dev.grab() failed: %s", exc)
         else:
             try:
                 self._dev.ungrab()
+                log.info("dev.ungrab() ok")
             except Exception as exc:
                 log.warning("dev.ungrab() failed: %s", exc)
 
@@ -85,6 +88,7 @@ class HotkeyListener:
                     continue
 
                 code = event.code
+                log.info("evdev key_down code=%d recording=%s", code, self._recording)
                 if code == self._toggle_code:
                     if self._paused:
                         continue

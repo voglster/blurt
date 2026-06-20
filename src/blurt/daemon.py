@@ -183,6 +183,11 @@ class Daemon:
 
     async def _finalize(self, outcome: Outcome) -> None:
         """Terminal transition out of RECORDING. Always returns daemon to IDLE."""
+        import time as _time
+        t0 = _time.monotonic()
+        def _ms(label: str) -> None:
+            log.info("finalize step %s @ +%dms", label, int((_time.monotonic() - t0) * 1000))
+
         log.info("finalize outcome=%s", outcome)
         self._state = State.FINALIZING
         self._set_tray(self._state)
@@ -191,15 +196,18 @@ class Daemon:
         # whisper before we tear down pw-cat. Kept short because the overlay
         # gives the user a natural pause-and-confirm beat already.
         await asyncio.sleep(0.1)
+        _ms("after-grace")
         if self._audio is not None:
             await self._audio.stop()
             self._audio = None
+        _ms("audio-stopped")
         if self._session_task is not None:
             try:
                 await self._session_task
             except Exception as exc:
                 log.warning("session task failed during finalize: %s", exc)
             self._session_task = None
+        _ms("session-task-joined")
 
         if self._session_error is not None:
             self._notify_error(str(self._session_error))
@@ -214,20 +222,26 @@ class Daemon:
                 if cleaned:
                     text = cleaned
             text = self._corrections.apply(text)
+        _ms("text-processed")
 
         self._overlay.hide()
+        _ms("overlay-hide-issued")
         self._hotkey.set_recording(False)
+        _ms("hotkey-ungrabbed")
 
         if outcome == Outcome.COMMIT:
             self._type_at_window(self._target_window, text)
+            _ms("typed")
         elif outcome == Outcome.COPY:
             self._clipboard_copy(text)
+            _ms("clipboard-copied")
         # CANCEL: do nothing.
 
         self._last_text = text
         self._state = State.IDLE
         self._set_tray(self._state)
         self._target_window = None
+        _ms("done")
 
     async def _handle_key(self, ke: KeyEvent) -> None:
         if self._state == State.IDLE:
