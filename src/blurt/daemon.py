@@ -225,9 +225,12 @@ class Daemon:
 
         self._overlay.hide()
         _ms("overlay-hide-issued")
-        self._hotkey.set_recording(False)
-        _ms("hotkey-ungrabbed")
 
+        # Type FIRST, ungrab AFTER. If the user is still holding Enter (or any
+        # other recording-mode key) when we'd otherwise have ungrabbed, the
+        # release event would leak to the focused app — e.g. terminal sees an
+        # Enter right after the typed text. Holding the grab through the type
+        # call ensures any lingering events are absorbed.
         if outcome == Outcome.COMMIT:
             self._type_at_window(self._target_window, text)
             _ms("typed")
@@ -235,6 +238,9 @@ class Daemon:
             self._clipboard_copy(text)
             _ms("clipboard-copied")
         # CANCEL: do nothing.
+
+        self._hotkey.set_recording(False)
+        _ms("hotkey-ungrabbed")
 
         self._last_text = text
         self._state = State.IDLE

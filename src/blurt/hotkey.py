@@ -88,7 +88,7 @@ class HotkeyListener:
                     continue
 
                 code = event.code
-                log.info("evdev key_down code=%d recording=%s", code, self._recording)
+                log.debug("evdev key_down code=%d recording=%s", code, self._recording)
                 if code == self._toggle_code:
                     if self._paused:
                         continue
