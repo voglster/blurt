@@ -187,8 +187,10 @@ class Daemon:
         self._state = State.FINALIZING
         self._set_tray(self._state)
 
-        # Let trailing audio reach whisper before we tear down.
-        await asyncio.sleep(0.3)
+        # Brief trailing-audio grace so the tail of the last word reaches
+        # whisper before we tear down pw-cat. Kept short because the overlay
+        # gives the user a natural pause-and-confirm beat already.
+        await asyncio.sleep(0.1)
         if self._audio is not None:
             await self._audio.stop()
             self._audio = None
