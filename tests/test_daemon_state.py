@@ -91,6 +91,19 @@ def test_copy_last_uses_stored_text() -> None:
     d._clipboard_copy.assert_called_once_with("previously")
 
 
+@pytest.mark.asyncio
+async def test_auto_finalize_on_error_releases_grab() -> None:
+    d = _make_daemon_with_mocks()
+    d._state = State.RECORDING
+    d._current_text = "partial"
+    d._session_error = RuntimeError("whisper unreachable")
+    await d._auto_finalize_on_error()
+    d._hotkey.set_recording.assert_called_with(False)
+    d._overlay.hide.assert_called()
+    d._notify_error.assert_called_once_with("whisper unreachable")
+    assert d._state == State.IDLE
+
+
 def test_toggle_pause_flips_hotkey() -> None:
     d = _make_daemon_with_mocks()
     d._paused = False

@@ -166,7 +166,11 @@ class Overlay:
         # Force layout so we can ask for required height.
         self._text_widget.update_idletasks()
         # Count display lines; multiply by line height for a height estimate.
-        line_count = int(self._text_widget.count("1.0", "end", "displaylines") or 1)
+        count_result = self._text_widget.count("1.0", "end", "displaylines")
+        if isinstance(count_result, tuple):
+            line_count = int(count_result[0]) if count_result else 1
+        else:
+            line_count = int(count_result or 1)
         font_metrics = self._text_widget.tk.call("font", "metrics", self._cfg.font, "-linespace")
         line_h = int(font_metrics)
         desired = line_count * line_h + 24  # padding

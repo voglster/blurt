@@ -171,6 +171,15 @@ class Daemon:
         except Exception as exc:
             log.warning("session error: %s", exc)
             self._session_error = exc
+            asyncio.get_event_loop().call_soon(
+                lambda: asyncio.create_task(self._auto_finalize_on_error())
+            )
+
+    async def _auto_finalize_on_error(self) -> None:
+        """Triggered when _run_session errors. Releases the device grab and
+        hides the overlay so the user isn't locked out."""
+        if self._state == State.RECORDING:
+            await self._finalize(Outcome.CANCEL)
 
     async def _finalize(self, outcome: Outcome) -> None:
         """Terminal transition out of RECORDING. Always returns daemon to IDLE."""
