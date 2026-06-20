@@ -152,7 +152,7 @@ class Daemon:
         self._current_text = ""
         self._session_error = None
         self._outcome = None
-        self._overlay.show()
+        self._overlay.show(target_window=self._target_window)
         self._overlay.set_text("")
         self._hotkey.set_recording(True)
         self._audio = AudioCapture()

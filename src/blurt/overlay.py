@@ -1,11 +1,76 @@
 from __future__ import annotations
 
 import logging
+import re
+import subprocess
 import threading
 import tkinter as tk
 from dataclasses import dataclass
 
 log = logging.getLogger(__name__)
+
+
+def _list_monitors() -> list[tuple[int, int, int, int]]:
+    """Return [(x, y, w, h), ...] for every monitor via xrandr --listmonitors."""
+    try:
+        out = subprocess.run(
+            ["xrandr", "--listmonitors"],
+            capture_output=True, text=True, check=True, timeout=1.0,
+        ).stdout
+    except (subprocess.SubprocessError, FileNotFoundError) as exc:
+        log.warning("xrandr --listmonitors failed: %s", exc)
+        return []
+    monitors: list[tuple[int, int, int, int]] = []
+    # Line shape: " 0: +*HDMI-1 1920/520x1080/290+0+0  HDMI-1"
+    pat = re.compile(r"(\d+)/\d+x(\d+)/\d+\+(-?\d+)\+(-?\d+)")
+    for line in out.splitlines():
+        m = pat.search(line)
+        if m:
+            w, h, x, y = (int(v) for v in m.groups())
+            monitors.append((x, y, w, h))
+    return monitors
+
+
+def _window_rect(window_id: int) -> tuple[int, int, int, int] | None:
+    """Return (x, y, w, h) for a window via xdotool, or None on failure."""
+    try:
+        out = subprocess.run(
+            ["xdotool", "getwindowgeometry", "--shell", str(window_id)],
+            capture_output=True, text=True, check=True, timeout=1.0,
+        ).stdout
+    except (subprocess.SubprocessError, FileNotFoundError) as exc:
+        log.warning("xdotool getwindowgeometry failed: %s", exc)
+        return None
+    fields: dict[str, int] = {}
+    for line in out.splitlines():
+        if "=" in line:
+            k, _, v = line.partition("=")
+            try:
+                fields[k.strip()] = int(v.strip())
+            except ValueError:
+                pass
+    try:
+        return fields["X"], fields["Y"], fields["WIDTH"], fields["HEIGHT"]
+    except KeyError:
+        return None
+
+
+def _monitor_for_window(window_id: int | None) -> tuple[int, int, int, int] | None:
+    """Return the monitor rect containing the window's center, or None."""
+    monitors = _list_monitors()
+    if not monitors:
+        return None
+    if window_id is None:
+        return monitors[0]
+    rect = _window_rect(window_id)
+    if rect is None:
+        return monitors[0]
+    cx = rect[0] + rect[2] // 2
+    cy = rect[1] + rect[3] // 2
+    for mx, my, mw, mh in monitors:
+        if mx <= cx < mx + mw and my <= cy < my + mh:
+            return (mx, my, mw, mh)
+    return monitors[0]
 
 
 @dataclass
@@ -34,6 +99,7 @@ class Overlay:
         self._text_widget: tk.Text | None = None
         self._pending_text: str | None = None
         self._visible: bool = False
+        self._monitor: tuple[int, int, int, int] | None = None
 
     # --- lifecycle ---
 
@@ -58,11 +124,14 @@ class Overlay:
 
     # --- public (thread-safe) ---
 
-    def show(self) -> None:
+    def show(self, target_window: int | None = None) -> None:
         if not self._cfg.enabled:
             return
         if self._root is None:
             return
+        # Resolve target monitor BEFORE marshalling to the Tk thread (xrandr +
+        # xdotool calls block; cheaper to do off the UI thread).
+        self._monitor = _monitor_for_window(target_window)
         self._root.after(0, self._show_impl)
 
     def hide(self) -> None:
@@ -124,12 +193,15 @@ class Overlay:
 
     def _show_impl(self) -> None:
         assert self._root is not None and self._text_widget is not None
-        screen_w = self._root.winfo_screenwidth()
-        screen_h = self._root.winfo_screenheight()
-        w = int(screen_w * self._cfg.width_fraction)
+        mx, my, mw, mh = self._monitor or (
+            0, 0,
+            self._root.winfo_screenwidth(),
+            self._root.winfo_screenheight(),
+        )
+        w = int(mw * self._cfg.width_fraction)
         h = self._cfg.min_height_px
-        x = (screen_w - w) // 2
-        y = screen_h - h - 80  # 80px above bottom edge
+        x = mx + (mw - w) // 2
+        y = my + mh - h - 80  # 80px above the monitor's bottom edge
         self._root.geometry(f"{w}x{h}+{x}+{y}")
         self._root.deiconify()
         self._root.lift()
@@ -161,11 +233,13 @@ class Overlay:
         assert self._root is not None and self._text_widget is not None
         if not self._visible:
             return
-        screen_h = self._root.winfo_screenheight()
-        max_h = int(screen_h * self._cfg.max_height_fraction)
-        # Force layout so we can ask for required height.
+        mx, my, mw, mh = self._monitor or (
+            0, 0,
+            self._root.winfo_screenwidth(),
+            self._root.winfo_screenheight(),
+        )
+        max_h = int(mh * self._cfg.max_height_fraction)
         self._text_widget.update_idletasks()
-        # Count display lines; multiply by line height for a height estimate.
         count_result = self._text_widget.count("1.0", "end", "displaylines")
         if isinstance(count_result, tuple):
             line_count = int(count_result[0]) if count_result else 1
@@ -175,15 +249,7 @@ class Overlay:
         line_h = int(font_metrics)
         desired = line_count * line_h + 24  # padding
         new_h = min(max(desired, self._cfg.min_height_px), max_h)
-        geom = self._root.geometry()  # "WxH+X+Y"
-        size, _, rest = geom.partition("+")
-        w_str, _, _ = size.partition("x")
-        x_str, _, y_str = rest.partition("+")
-        try:
-            screen_w = self._root.winfo_screenwidth()
-            w = int(w_str)
-            new_y = screen_h - new_h - 80
-            new_x = (screen_w - w) // 2
-            self._root.geometry(f"{w}x{new_h}+{new_x}+{new_y}")
-        except ValueError:
-            pass
+        w = int(mw * self._cfg.width_fraction)
+        new_x = mx + (mw - w) // 2
+        new_y = my + mh - new_h - 80
+        self._root.geometry(f"{w}x{new_h}+{new_x}+{new_y}")
