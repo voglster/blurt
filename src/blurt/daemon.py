@@ -182,7 +182,12 @@ class Daemon:
             await self._finalize(Outcome.CANCEL)
 
     async def _finalize(self, outcome: Outcome) -> None:
-        """Terminal transition out of RECORDING. Always returns daemon to IDLE."""
+        """Terminal transition out of RECORDING. Always returns daemon to IDLE.
+
+        Fast-path: snapshot whatever the overlay was showing and act on that
+        immediately. We do NOT wait for WhisperLive's "official final" — the
+        user already accepted the displayed text by pressing commit.
+        """
         import time as _time
         t0 = _time.monotonic()
         def _ms(label: str) -> None:
@@ -192,28 +197,22 @@ class Daemon:
         self._state = State.FINALIZING
         self._set_tray(self._state)
 
-        # Brief trailing-audio grace so the tail of the last word reaches
-        # whisper before we tear down pw-cat. Kept short because the overlay
-        # gives the user a natural pause-and-confirm beat already.
-        await asyncio.sleep(0.1)
-        _ms("after-grace")
+        # Snapshot what the overlay showed — that's what the user committed to.
+        text = self._current_text
+
+        # Tear down audio and the whisper session in the background. Don't wait.
         if self._audio is not None:
             await self._audio.stop()
             self._audio = None
         _ms("audio-stopped")
-        if self._session_task is not None:
-            try:
-                await self._session_task
-            except Exception as exc:
-                log.warning("session task failed during finalize: %s", exc)
-            self._session_task = None
-        _ms("session-task-joined")
+        if self._session_task is not None and not self._session_task.done():
+            self._session_task.cancel()
+        self._session_task = None
+        _ms("session-task-cancelled")
 
         if self._session_error is not None:
             self._notify_error(str(self._session_error))
             self._session_error = None
-
-        text = self._current_text
 
         # Cleanup + corrections only apply on COMMIT and COPY (not CANCEL).
         if outcome in (Outcome.COMMIT, Outcome.COPY) and text:
