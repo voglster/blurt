@@ -13,8 +13,9 @@ from blurt.cleanup_client import CleanupClient
 from blurt.config import load as load_config
 from blurt.corrections import load as load_corrections
 from blurt.hotkey import HotkeyListener, KeyEvent
-from blurt.injector import type_at_window
+from blurt.injector import make_typer
 from blurt.overlay import Overlay, OverlayConfig
+from blurt.session import is_wayland
 from blurt.tray import Tray, TrayState
 from blurt.whisper_client import WhisperLiveServer, WhisperSession, WyomingServer
 
@@ -97,9 +98,14 @@ class Daemon:
             )
             if self._cfg.tray.enabled else None
         )
-        self._type_at_window = type_at_window
-        self._clipboard_copy = clipboard.copy
-        self._get_active_window = _xdotool_get_active_window
+        self._type_at_window = make_typer()
+        self._clipboard_copy = clipboard.make_copy()
+        # Wayland has no global window activation, so there's nothing to
+        # capture or restore — the overlay (hidden before we type) returns
+        # focus to the previously-focused app on its own.
+        self._get_active_window = (
+            (lambda: None) if is_wayland() else _xdotool_get_active_window
+        )
         self._notify_error = lambda msg: _notify("blurt: whisper error", msg)
 
         self._state = State.IDLE

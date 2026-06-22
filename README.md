@@ -14,11 +14,12 @@ Right-click the tray icon for "Copy last transcript" (retrieves the last commit 
 
 ## Requirements
 
-- X11 (not Wayland)
-- `xdotool`, `pw-cat` (PipeWire utils)
-- `xclip` (clipboard-copy feature: `sudo apt install xclip`)
+- X11 or Wayland — input injection is auto-detected per session:
+    - **X11:** types via `xdotool`; clipboard via `xclip` (`sudo apt install xclip`)
+    - **Wayland:** types via a `/dev/uinput` virtual keyboard (compositor-agnostic, works on GNOME/Mutter); clipboard via `wl-copy` (`sudo apt install wl-clipboard`)
+- `pw-cat` (PipeWire utils)
 - Python 3.12+
-- User in the `input` group (for evdev key access)
+- User in the `input` group, and read/write access to `/dev/uinput` (logind grants this to the active seat; needed for the Wayland typer)
 - Remote `llmbox` running:
     - Wyoming faster-whisper on TCP 10300
     - Ollama on HTTP 11434
