@@ -280,6 +280,11 @@ class Daemon:
 
     async def run(self) -> int:
         logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+        log.info(
+            "session: wayland=%s, input backend=%s",
+            is_wayland(),
+            type(self._type_at_window).__name__,
+        )
         self._overlay.start()
         if self._tray is not None:
             self._tray.start()
