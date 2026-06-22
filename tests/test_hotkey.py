@@ -89,3 +89,36 @@ async def test_set_recording_grabs_and_ungrabs() -> None:
     assert dev.grabbed is True
     listener.set_recording(False)
     assert dev.grabbed is False
+
+
+class StrictGrabDevice(FakeDevice):
+    """Mimics evdev: ungrab() on a non-grabbed device raises EINVAL."""
+
+    def __init__(self) -> None:
+        super().__init__([])
+        self.ungrab_calls = 0
+
+    def ungrab(self) -> None:
+        self.ungrab_calls += 1
+        if not self.grabbed:
+            raise OSError(22, "Invalid argument")
+        self.grabbed = False
+
+
+def test_set_recording_false_when_never_grabbed_does_not_ungrab() -> None:
+    dev = StrictGrabDevice()
+    listener = HotkeyListener(device=dev)
+    listener.set_recording(False)  # e.g. shutdown path with no active recording
+    assert dev.ungrab_calls == 0
+
+
+def test_set_recording_is_idempotent() -> None:
+    dev = StrictGrabDevice()
+    listener = HotkeyListener(device=dev)
+    listener.set_recording(True)
+    listener.set_recording(True)  # no double-grab
+    assert dev.grabbed is True
+    listener.set_recording(False)
+    listener.set_recording(False)  # no EINVAL on second ungrab
+    assert dev.grabbed is False
+    assert dev.ungrab_calls == 1

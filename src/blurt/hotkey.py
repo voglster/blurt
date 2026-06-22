@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 from collections.abc import AsyncIterator
 from enum import Enum
@@ -47,6 +46,7 @@ class HotkeyListener:
         self._copy_code = ecodes.ecodes["KEY_C"]
         self._recording = False
         self._paused = False
+        self._grabbed = False
         self._dev = device  # for testing; if None, opened in events()
 
     def set_recording(self, value: bool) -> None:
@@ -55,17 +55,26 @@ class HotkeyListener:
             log.info("set_recording(%s) called before device opened — no grab", value)
             return
         if value:
+            if self._grabbed:
+                return
             try:
                 self._dev.grab()
+                self._grabbed = True
                 log.info("dev.grab() ok on %s", getattr(self._dev, "path", "?"))
             except Exception as exc:
                 log.warning("dev.grab() failed: %s", exc)
         else:
+            # Only ungrab if we actually hold the grab; ungrab on a non-grabbed
+            # device raises EINVAL, which spammed the shutdown path with warnings.
+            if not self._grabbed:
+                return
             try:
                 self._dev.ungrab()
                 log.info("dev.ungrab() ok")
             except Exception as exc:
                 log.warning("dev.ungrab() failed: %s", exc)
+            finally:
+                self._grabbed = False
 
     def set_paused(self, value: bool) -> None:
         self._paused = value
