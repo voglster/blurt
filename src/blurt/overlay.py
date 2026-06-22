@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import gc
 import logging
 import re
 import subprocess
@@ -115,10 +116,18 @@ class Overlay:
             return
         root = self._root
         if root is not None:
+            # Ask the Tk thread to exit its mainloop; the actual destroy +
+            # interpreter teardown happens on that thread in _run's finally,
+            # which is the only thread allowed to delete the Tcl interpreter.
             try:
-                root.after(0, root.destroy)
+                root.after(0, root.quit)
             except tk.TclError:
                 pass
+        # Drop this thread's reference BEFORE joining. If we held it across the
+        # join, the worker thread's gc.collect() couldn't free the interpreter
+        # (live ref here), and it would instead be finalized on this thread at
+        # shutdown — the exact cross-thread teardown we're avoiding.
+        del root
         if self._thread is not None:
             self._thread.join(timeout=2.0)
 
@@ -183,13 +192,19 @@ class Overlay:
         except tk.TclError:
             pass
         finally:
-            # destroy() may already have been called via stop(); guard against
-            # double-destroy.
             try:
                 self._root.destroy()
             except tk.TclError:
                 pass
+            # Drop EVERY reference to a Tk object so the Tcl interpreter is
+            # finalized here, on its creating thread. root and the Text widget
+            # form a reference cycle, so plain refcounting won't free the
+            # interpreter — without the explicit collect it survives until
+            # process-shutdown GC on the main thread, which aborts with
+            # "Tcl_AsyncDelete: async handler deleted by the wrong thread".
+            self._text_widget = None
             self._root = None
+            gc.collect()
 
     def _show_impl(self) -> None:
         assert self._root is not None and self._text_widget is not None
