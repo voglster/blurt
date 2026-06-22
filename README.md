@@ -18,7 +18,10 @@ Right-click the tray icon for "Copy last transcript" (retrieves the last commit 
     - **X11:** types via `xdotool`; clipboard via `xclip` (`sudo apt install xclip`)
     - **Wayland:** types via a `/dev/uinput` virtual keyboard (compositor-agnostic, works on GNOME/Mutter); clipboard via `wl-copy` (`sudo apt install wl-clipboard`)
 - `pw-cat` (PipeWire utils)
-- Python 3.12+
+- Python 3.12+ with an **Xft-enabled Tk** for the overlay font. The system
+  `python3` + `python3-tk` (`sudo apt install python3-tk`) qualifies; uv's
+  standalone Python bundles a Tk built *without* Xft, which renders the overlay
+  in a non-anti-aliased bitmap font. Install on the system interpreter (see below).
 - User in the `input` group, and read/write access to `/dev/uinput` (logind grants this to the active seat; needed for the Wayland typer)
 - Remote `llmbox` running:
     - Wyoming faster-whisper on TCP 10300
@@ -26,7 +29,8 @@ Right-click the tray icon for "Copy last transcript" (retrieves the last commit 
 
 ## Install
 
-    uv tool install -e .
+    # Install on the system interpreter so the overlay gets an Xft (anti-aliased) Tk.
+    uv tool install --python /usr/bin/python3 --editable .
     mkdir -p ~/.config/blurt
     # Copy example config + corrections (see docs/superpowers/specs/...)
     cp systemd/blurt.service ~/.config/systemd/user/
