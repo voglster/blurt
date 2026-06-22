@@ -56,21 +56,66 @@ def _window_rect(window_id: int) -> tuple[int, int, int, int] | None:
         return None
 
 
-def _monitor_for_window(window_id: int | None) -> tuple[int, int, int, int] | None:
-    """Return the monitor rect containing the window's center, or None."""
+def _pointer_xy() -> tuple[int, int] | None:
+    """Return the pointer's (x, y) in the X/XWayland screen space, or None.
+
+    This is the best monitor hint on Wayland, where there's no focused-window
+    geometry to query — the overlay should appear on whatever screen the user
+    is actively working on, which is almost always where their cursor is.
+    """
+    try:
+        out = subprocess.run(
+            ["xdotool", "getmouselocation", "--shell"],
+            capture_output=True, text=True, check=True, timeout=1.0,
+        ).stdout
+    except (subprocess.SubprocessError, FileNotFoundError) as exc:
+        log.warning("xdotool getmouselocation failed: %s", exc)
+        return None
+    fields: dict[str, int] = {}
+    for line in out.splitlines():
+        k, _, v = line.partition("=")
+        if k in ("X", "Y"):
+            try:
+                fields[k] = int(v.strip())
+            except ValueError:
+                pass
+    if "X" in fields and "Y" in fields:
+        return fields["X"], fields["Y"]
+    return None
+
+
+def _monitor_containing(
+    monitors: list[tuple[int, int, int, int]], x: int, y: int
+) -> tuple[int, int, int, int] | None:
+    for mx, my, mw, mh in monitors:
+        if mx <= x < mx + mw and my <= y < my + mh:
+            return (mx, my, mw, mh)
+    return None
+
+
+def _resolve_monitor(window_id: int | None) -> tuple[int, int, int, int] | None:
+    """Pick the monitor to show the overlay on.
+
+    Prefer the monitor under the target window's center (X11, where we have a
+    window id); otherwise fall back to the monitor under the pointer (Wayland,
+    where window_id is None). Last resort is the first monitor.
+    """
     monitors = _list_monitors()
     if not monitors:
         return None
-    if window_id is None:
-        return monitors[0]
-    rect = _window_rect(window_id)
-    if rect is None:
-        return monitors[0]
-    cx = rect[0] + rect[2] // 2
-    cy = rect[1] + rect[3] // 2
-    for mx, my, mw, mh in monitors:
-        if mx <= cx < mx + mw and my <= cy < my + mh:
-            return (mx, my, mw, mh)
+    if window_id is not None:
+        rect = _window_rect(window_id)
+        if rect is not None:
+            cx = rect[0] + rect[2] // 2
+            cy = rect[1] + rect[3] // 2
+            found = _monitor_containing(monitors, cx, cy)
+            if found is not None:
+                return found
+    pos = _pointer_xy()
+    if pos is not None:
+        found = _monitor_containing(monitors, *pos)
+        if found is not None:
+            return found
     return monitors[0]
 
 
@@ -140,7 +185,7 @@ class Overlay:
             return
         # Resolve target monitor BEFORE marshalling to the Tk thread (xrandr +
         # xdotool calls block; cheaper to do off the UI thread).
-        self._monitor = _monitor_for_window(target_window)
+        self._monitor = _resolve_monitor(target_window)
         self._root.after(0, self._show_impl)
 
     def hide(self) -> None:
