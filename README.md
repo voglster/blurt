@@ -55,6 +55,36 @@ Right-click the tray icon for "Copy last transcript" (retrieves the last commit 
 recordings of your own voice, not synthesized speech, since TTS audio is too clean to
 separate the candidates.
 
+## Model selection
+
+Benchmarked 2026-07-25 on `llmbox` (RTX 3080) against four recorded fixtures, using
+`blurt bench-stt`. **Result: `base.en` with `[stt] initial_prompt` + `hotwords` set.**
+
+| model | WER (prompted) | partials/s | on disk | VRAM |
+|---|---|---|---|---|
+| **base.en** | **0.000** | **3.7** | **141 MB** | **527 MiB** |
+| small.en | 0.000 | 3.7 | 464 MB | 975 MiB |
+| distil-large-v3.5 | 0.025 | 3.7 | 1.5 GB | — |
+| large-v3-turbo | 0.000 | 2.9 | 1.6 GB | — |
+
+The accuracy win came from **prompting, not model size**: `base.en` goes from 0.054
+unprompted to 0.000 prompted, and no larger model beat it. Bigger models cost partial
+cadence, which is what makes the live overlay feel live.
+
+Two caveats worth knowing before changing `model`:
+
+- **`small.en` silently truncates.** Under a shorter `initial_prompt` it stopped
+  transcribing after the first sentence of a test utterance — 20 partials instead of 43,
+  two-thirds of the words gone, no error. Deterministic, and non-monotonic (the longer
+  prompt and no prompt are both fine). Avoid it.
+- **`large-v3-turbo` needs no prompt at all** (0.000 even unprompted), which makes it the
+  better choice for noisy or offsite use where per-environment prompt tuning is impractical.
+  It is ~25% slower in partial cadence, so it is not the better desktop default.
+
+These fixtures are clean, close-miked, read speech — the regime where small models do best.
+Published LibriSpeech WER shows the gap widening on hard audio: base.en 10.2% vs large-v3
+5.2% on test-other. Expect to want a bigger model in noisy conditions.
+
 ## Configuration notes
 
 - `[whisper] use_vad` has **no effect**. WhisperLive takes VAD as a server launch flag

@@ -1049,13 +1049,13 @@ Dictate three real sentences containing technical terms and confirm the overlay 
 fills in while you speak. If partials feel noticeably sparser than before, revert the one
 config line and pick the runner-up.
 
-- [ ] **Step 7: Update docs with the measured result**
+- [x] **Step 7: Update docs with the measured result** — README gained a "Model selection" section with the measured table, the `small.en` truncation warning, and the turbo-for-noisy-conditions note.
 
 Update `docs/config.example.toml`'s `model` line to the winner, and add a short "Model
 selection" section to the README naming the winner, its mean WER, its median final
 latency, and the date measured — so the next reader does not re-litigate it.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add docs/config.example.toml README.md
@@ -1503,6 +1503,7 @@ Append one row per session, before clearing context.
 | Date | Task | Commit | Notes |
 |---|---|---|---|
 | 2026-07-25 | Plan authored | — | Baseline: `017c34e`, 62 tests green, working tree clean. Environment facts verified and recorded in the design doc. Discarded leftover debug logging in `overlay.py` from `017c34e`. |
+| 2026-07-25 | 5 — model choice COMPLETE | (this commit) | **Winner: `base.en`, unchanged.** Prompting was the whole win (0.054 -> 0.000); no larger model beat it. `small.en` disqualified for deterministic silent truncation under a shorter prompt. `large-v3-turbo` is the robustness winner (0.000 even unprompted) but costs ~25% partial cadence for zero measured gain in the deployed config — flagged as the right choice for the laptop and for after correction-capture ships. Measured VRAM: base.en 527 MiB, small.en 975 MiB (idle server 827 MiB). **Two process lessons: (1) my first sweep was confounded — one shared prompt across all models measured 'models given this prompt', not the models; (2) I over-ticked checkboxes with a positional script and had to un-tick Task 5 steps 5-8. Tick deliberately, not positionally.** |
 | 2026-07-25 | 4 — fixtures recorded | (this commit) | User recorded all four takes; all validate at 16 kHz/mono/s16. Durations 10.0-12.2 s, `silence.wav` peak 180 (genuinely quiet, so it is a real hallucination check). **Levels are lowish** — peak 4274-6062, RMS 336-599; `prose.wav` only just cleared the recorder's 4000 floor. If WER is poor across *every* model, suspect mic gain before the models. 1.3 MB committed. |
 | 2026-07-25 | Recorder + user verification | (this commit) | Added `scripts/record-fixtures.sh`: Enter/speak/Enter with re-record, targets the FIFINE by node name, and validates format + level + duration per take (room tone measured at peak ~950, so the speech floor is 4000). Gotcha found: `pw-cat --record` ignores SIGINT *and* SIGTERM, so stopping escalates to SIGKILL — safe because the WAV frame count stays patched as it writes. Launched in tmux session `blurt-fixtures`. User confirmed overlay-on-primary works (Task 6 Step 14) and that GitHub/JSON/kubectl now transcribe correctly (Task 3 Step 11) — both ticked. New Phase 2 item recorded: correction-capture / hotword feedback loop. |
 | 2026-07-25 | 5 — model choice (steps 1-3) | (this commit) | llmbox prep done, no reboot needed for it. **No WhisperLive/faster-whisper upgrade required** — 0.8.0 / 1.2.0 already support everything. Both candidate models pulled (cache 605 MB -> 3.6 GB, persistent volume). **Caveat found: only ~4.8 GB VRAM free** — `mimic-server` in `mimic-tts` holds 4320 MiB of the 10240 MiB card, whisperlive only 224 MiB. Step 4 must run one model at a time; details in the step. Separately, llmbox's host `nvidia-smi` is broken (loaded module 580.159.03 vs built/userspace 580.173.02 — driver upgraded without a module reload); containers unaffected, fix is a reboot, walked the user through it. **Steps 4-8 OUTSTANDING — need fixtures from Task 4 Step 1 first.** |
