@@ -250,7 +250,7 @@ git commit -m "docs: describe the WhisperLive path that actually runs; add desig
   - `wer.normalize(text: str) -> list[str]` — lowercase, strip punctuation, split on whitespace
   - `wer.wer(reference: str, hypothesis: str) -> float` — word edit distance ÷ reference word count; `0.0` when both normalize to empty, `1.0` when the reference is empty but the hypothesis is not
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `tests/test_wer.py`:
 
@@ -290,12 +290,12 @@ and the hypothesis replaces `kubectl apply` with `cube cuttle` — 2 substitutio
 reference words = 0.5. That is exactly the failure mode `corrections.yaml` exists to
 patch, so it belongs in the suite.
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `.venv/bin/python -m pytest tests/test_wer.py -q`
 Expected: FAIL — `ModuleNotFoundError: No module named 'blurt.wer'`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Create `src/blurt/wer.py`:
 
@@ -335,12 +335,12 @@ def _edit_distance(a: list[str], b: list[str]) -> int:
     return previous[-1]
 ```
 
-- [ ] **Step 4: Run to verify it passes**
+- [x] **Step 4: Run to verify it passes**
 
 Run: `.venv/bin/python -m pytest tests/test_wer.py -q`
 Expected: PASS, 6 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/blurt/wer.py tests/test_wer.py
@@ -1299,4 +1299,5 @@ Append one row per session, before clearing context.
 | Date | Task | Commit | Notes |
 |---|---|---|---|
 | 2026-07-25 | Plan authored | — | Baseline: `017c34e`, 62 tests green, working tree clean. Environment facts verified and recorded in the design doc. Discarded leftover debug logging in `overlay.py` from `017c34e`. |
+| 2026-07-25 | 2 — WER helper | (this commit) | Done, no surprises. 68 tests green (62 -> 68), ruff clean. **Next: Task 3 (initial_prompt + hotwords).** |
 | 2026-07-25 | 1 — Documentation truth-up | (this commit) | Done. Two things not in the plan: (a) the tree was not ruff-clean at baseline — 4 pre-existing F401/F841 in `whisper_bench.py`, `whisper_client.py`, `test_config.py`, `test_whisper_client.py` — fixed here so later tasks inherit a passing gate; (b) added `docs/corrections.example.yaml`, since the README told you to create `~/.config/blurt/corrections.yaml` with no example to copy. 62 tests green, ruff clean. **Next: Task 2 (WER helper).** |
