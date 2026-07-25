@@ -11,7 +11,14 @@ class WhisperConfig:
     host: str = "llmbox"
     port: int = 10300
     model: str = "small.en"    # whisperlive only
-    use_vad: bool = True       # whisperlive only
+    # No-op: WhisperLive takes VAD as a server launch flag and ignores this field.
+    use_vad: bool = True
+
+
+@dataclass(frozen=True)
+class SttConfig:
+    initial_prompt: str = ""
+    hotwords: str = ""
 
 
 @dataclass(frozen=True)
@@ -58,6 +65,7 @@ class ClipboardConfig:
 @dataclass(frozen=True)
 class Config:
     whisper: WhisperConfig = field(default_factory=WhisperConfig)
+    stt: SttConfig = field(default_factory=SttConfig)
     cleanup: CleanupConfig = field(default_factory=CleanupConfig)
     hotkey: HotkeyConfig = field(default_factory=HotkeyConfig)
     corrections: CorrectionsConfig = field(default_factory=CorrectionsConfig)
@@ -77,6 +85,7 @@ def load(path: Path | None = None) -> Config:
         data = tomllib.load(f)
     return Config(
         whisper=WhisperConfig(**data.get("whisper", {})),
+        stt=SttConfig(**data.get("stt", {})),
         cleanup=CleanupConfig(**data.get("cleanup", {})),
         hotkey=HotkeyConfig(**data.get("hotkey", {})),
         corrections=CorrectionsConfig(**data.get("corrections", {})),

@@ -71,6 +71,8 @@ class Daemon:
                 port=self._cfg.whisper.port,
                 model=self._cfg.whisper.model,
                 use_vad=self._cfg.whisper.use_vad,
+                initial_prompt=self._cfg.stt.initial_prompt,
+                hotwords=self._cfg.stt.hotwords,
             )
         else:
             self._whisper_server = WyomingServer(

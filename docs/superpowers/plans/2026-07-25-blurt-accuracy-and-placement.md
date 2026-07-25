@@ -367,7 +367,7 @@ git commit -m "wer: add stdlib word error rate helper for STT benchmarking"
 Empty config strings must become `None` in the payload, not `""` — faster-whisper treats
 an empty-string prompt differently from an absent one.
 
-- [ ] **Step 1: Write the failing test for the connect payload**
+- [x] **Step 1: Write the failing test for the connect payload**
 
 Add to `tests/test_whisper_client.py`:
 
@@ -433,12 +433,12 @@ async def test_connect_payload_omits_blank_prompt(monkeypatch):
     assert config["hotwords"] is None
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `.venv/bin/python -m pytest tests/test_whisper_client.py -q`
 Expected: FAIL — `WhisperLiveServer.__init__() got an unexpected keyword argument 'initial_prompt'`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `src/blurt/whisper_client.py`, extend `WhisperLiveServer.__init__`:
 
@@ -479,12 +479,12 @@ and extend the config payload in `stream()`:
             }))
 ```
 
-- [ ] **Step 4: Run to verify it passes**
+- [x] **Step 4: Run to verify it passes**
 
 Run: `.venv/bin/python -m pytest tests/test_whisper_client.py -q`
 Expected: PASS, including the pre-existing session test.
 
-- [ ] **Step 5: Write the failing config test**
+- [x] **Step 5: Write the failing config test**
 
 Add to `tests/test_config.py`:
 
@@ -503,12 +503,12 @@ def test_stt_overrides(tmp_path):
     assert cfg.stt.hotwords == "kubectl,JSON"
 ```
 
-- [ ] **Step 6: Run to verify it fails**
+- [x] **Step 6: Run to verify it fails**
 
 Run: `.venv/bin/python -m pytest tests/test_config.py -q`
 Expected: FAIL — `AttributeError: 'Config' object has no attribute 'stt'`
 
-- [ ] **Step 7: Add the config section**
+- [x] **Step 7: Add the config section**
 
 In `src/blurt/config.py`, add the dataclass next to `WhisperConfig`:
 
@@ -531,7 +531,7 @@ and to `load()`:
         stt=SttConfig(**data.get("stt", {})),
 ```
 
-- [ ] **Step 8: Wire it into the daemon**
+- [x] **Step 8: Wire it into the daemon**
 
 In `src/blurt/daemon.py`, extend the `WhisperLiveServer` construction:
 
@@ -546,12 +546,12 @@ In `src/blurt/daemon.py`, extend the `WhisperLiveServer` construction:
             )
 ```
 
-- [ ] **Step 9: Run the full suite and linter**
+- [x] **Step 9: Run the full suite and linter**
 
 Run: `.venv/bin/python -m pytest -q && .venv/bin/python -m ruff check src tests`
 Expected: green and clean.
 
-- [ ] **Step 10: Populate the live config**
+- [x] **Step 10: Populate the live config**
 
 Add to `~/.config/blurt/config.toml`, seeded from the terms already in
 `corrections.yaml` and `cleanup_client.SYSTEM_PROMPT`:
@@ -1299,5 +1299,6 @@ Append one row per session, before clearing context.
 | Date | Task | Commit | Notes |
 |---|---|---|---|
 | 2026-07-25 | Plan authored | — | Baseline: `017c34e`, 62 tests green, working tree clean. Environment facts verified and recorded in the design doc. Discarded leftover debug logging in `overlay.py` from `017c34e`. |
+| 2026-07-25 | 3 — initial_prompt + hotwords | (this commit) | Code + config + daemon wiring done; 72 tests green, ruff clean. Live `~/.config/blurt/config.toml` gained an `[stt]` block and the daemon was restarted. **Step 11 (dictate-and-check, incl. the silence hallucination check) is still OUTSTANDING — needs the user at the keyboard.** Task 4 step 6 measures the same thing properly. **Next: Task 4 (bench-stt), which needs fixture recordings from the user first.** |
 | 2026-07-25 | 2 — WER helper | (this commit) | Done, no surprises. 68 tests green (62 -> 68), ruff clean. **Next: Task 3 (initial_prompt + hotwords).** |
 | 2026-07-25 | 1 — Documentation truth-up | (this commit) | Done. Two things not in the plan: (a) the tree was not ruff-clean at baseline — 4 pre-existing F401/F841 in `whisper_bench.py`, `whisper_client.py`, `test_config.py`, `test_whisper_client.py` — fixed here so later tasks inherit a passing gate; (b) added `docs/corrections.example.yaml`, since the README told you to create `~/.config/blurt/corrections.yaml` with no example to copy. 62 tests green, ruff clean. **Next: Task 2 (WER helper).** |

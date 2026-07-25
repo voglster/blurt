@@ -76,3 +76,17 @@ def test_overlay_and_clipboard_overrides(tmp_path):
     assert cfg.overlay.opacity == 0.5
     assert cfg.overlay.width_fraction == 0.8
     assert cfg.clipboard.tool == "xclip"
+
+
+def test_stt_defaults_are_blank(tmp_path):
+    cfg = load(tmp_path / "missing.toml")
+    assert cfg.stt.initial_prompt == ""
+    assert cfg.stt.hotwords == ""
+
+
+def test_stt_overrides(tmp_path):
+    p = tmp_path / "config.toml"
+    p.write_text('[stt]\ninitial_prompt = "kubectl"\nhotwords = "kubectl,JSON"\n')
+    cfg = load(p)
+    assert cfg.stt.initial_prompt == "kubectl"
+    assert cfg.stt.hotwords == "kubectl,JSON"

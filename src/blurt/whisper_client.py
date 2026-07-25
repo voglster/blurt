@@ -105,12 +105,16 @@ class WhisperLiveServer:
         model: str = "small.en",
         language: str = "en",
         use_vad: bool = True,
+        initial_prompt: str | None = None,
+        hotwords: str | None = None,
     ) -> None:
         self._host = host
         self._port = port
         self._model = model
         self._language = language
         self._use_vad = use_vad
+        self._initial_prompt = initial_prompt or None
+        self._hotwords = hotwords or None
 
     async def stream(
         self, audio_chunks: AsyncIterator[bytes]
@@ -123,6 +127,8 @@ class WhisperLiveServer:
         uid = str(uuid.uuid4())
 
         async with connect(uri, max_size=2**24) as ws:
+            # use_vad is sent for completeness only: WhisperLive 0.8.0 passes its own
+            # server launch flag to the backend and ignores this field.
             await ws.send(json.dumps({
                 "uid": uid,
                 "language": self._language,
@@ -130,6 +136,8 @@ class WhisperLiveServer:
                 "model": self._model,
                 "use_vad": self._use_vad,
                 "send_last_n_segments": 10,
+                "initial_prompt": self._initial_prompt,
+                "hotwords": self._hotwords,
             }))
 
             ready = False
