@@ -984,6 +984,50 @@ Sources: Whisper paper (arxiv 2212.04356), huggingface/distil-whisper issue #20.
 the exact conditions where base.en gives up the most. The laptop may want a different model
 than the desktop, which strengthens the per-host config-divergence question.
 
+**Prompt-sensitivity matrix (added 2026-07-25, after the first sweep proved confounded).**
+The original sweep gave every model the same 14-term prompt, so it measured models *given one
+prompt* rather than model robustness. Re-run as 3 models x 3 prompt variants x 2 fixtures
+(WER / partial count; TRUNC = silently stopped transcribing mid-utterance):
+
+| model | LONG prompt (14 terms) | SHORT prompt (5 terms) | no prompt |
+|---|---|---|---|
+| **base.en** | 0.000 / 43p, 45p | 0.000 / 40p, 39p | 0.056, 0.074 / 51p, 52p |
+| small.en | 0.000 / 41p, 39p | **0.694 TRUNC**, 0.000 | 0.028, 0.000 / 43p, 50p |
+| large-v3-turbo | 0.000 / 31p, 35p | 0.000 / 32p, 38p | **0.000 / 28p, 34p** |
+
+**`small.en` is disqualified.** With the 5-term prompt it truncates `mixed.wav` to just its
+first sentence — 20 partials instead of 43, two-thirds of the words gone, no error raised.
+Reproduced 5/5, fully deterministic. `mixed.wav`'s first sentence ends in a question mark and
+small.en treats that as end-of-utterance; the longer prompt happens to suppress it. Note this
+is **non-monotonic** — it fails with the short prompt but is fine with the long prompt *and*
+with no prompt at all, so there is no "shorter is safer" rule to reason with.
+
+Ruled out as the cause: blurt's own finalization. Raising `QUIET_GAP_SECONDS` from 0.5 to 1.5
+to 3.0 changed nothing (still ~20 partials), so this is server/model-side, not the client
+declaring final too early.
+
+**`large-v3-turbo` is the accuracy/robustness winner** — 0.000 on every variant including no
+prompt, the only model that does not need prompting at all. It still loses for the desktop:
+zero measured accuracy gain over base.en *in the configuration actually deployed*, against
+~25% fewer partials (2.8/s vs 3.9/s), 1.6 GB vs 141 MB, and roughly double the VRAM. It is
+also reported to hallucinate more on very short clips, which is untested here — the fixtures
+are 10-12 s while real dictation is often 2-5 s.
+
+**Decision: stay on `base.en` + the long prompt.** It is 0.000 in the deployed config, has the
+best partial cadence (which is what makes the overlay feel live), and degrades *gracefully*
+(0.056) rather than truncating when prompting weakens.
+
+**Switch to turbo when either becomes true:**
+1. **Laptop / offsite use** — ambient noise is where base.en's hard-audio gap (10.2% vs 5.2%)
+   bites, and turbo needs no per-environment prompt tuning.
+2. **Correction-capture ships** — once something auto-edits `hotwords`/`initial_prompt`,
+   base.en's accuracy is coupled to an input this matrix proves can fail catastrophically.
+   Turbo's prompt-independence stops being a luxury at that point.
+
+**Measured VRAM footprint** (peak while decoding minus an idle server at 827 MiB):
+`base.en` 527 MiB, `small.en` 975 MiB. On disk: base.en 141 MB, small.en 464 MB,
+distil-large-v3.5 1.5 GB, large-v3-turbo 1.6 GB.
+
 **If this bench is ever to rank models again it needs harder fixtures**: background noise,
 faster speech, longer utterances, disfluencies, and vocabulary deliberately left out of the
 prompt.
@@ -1413,6 +1457,14 @@ setup.
     Watching the config/corrections files and reloading in place is likely a prerequisite.
   - **Guard.** An unbounded auto-grown hotword list will eventually hurt accuracy — faster-whisper
     biases toward every term given. Needs a cap, or a usage count, or a review step.
+  - **Guard, the serious one.** The 2026-07-25 prompt-sensitivity matrix showed that changing
+    the prompt can make a model **silently truncate** an utterance (`small.en` dropped two
+    thirds of a sentence with a shorter prompt, deterministically, and non-monotonically — long
+    and empty prompts were both fine). So mutating `initial_prompt`/`hotwords` automatically is
+    not a safe operation. Any auto-tuning MUST re-run `bench-stt` against the fixtures after a
+    change and refuse to persist a prompt that regresses WER or partial count. A truncation
+    guard in `WhisperLiveServer` — flag a final that arrives with suspiciously few partials for
+    the audio duration — would also catch this class of failure in production.
 
 - **Laptop support (last in the queue).** Today blurt only runs on jv-desktop, so dictation
   is unavailable offsite and the workflow changes. The goal is the same tap-to-dictate flow
