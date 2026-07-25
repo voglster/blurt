@@ -1497,7 +1497,7 @@ setup.
   Also note `Claude` and `cloud` are near-homophones and both are in this user's vocabulary, so
   the prompt names both in natural context rather than boosting only one.
 
-- **Pin the model server-side to recover first-partial latency (2026-07-25).** The whisperlive
+- ~~**Pin the model server-side to recover first-partial latency (2026-07-25).**~~ **DONE 2026-07-25.** Added `command: python run_server.py -fw deepdml/faster-whisper-large-v3-turbo-ct2` to llmbox's compose (original backed up as `docker-compose.yml.bak-2026-07-25`). Server logs `Custom model option was provided. Switching to single model mode.` and `Loading model:` now appears **once ever** instead of once per dictation. First partial went from 1642/1799/2138 ms to a flat **1087/1102/1106 ms** — the variance *was* the model load. This is faster than base.en ever managed (1189-1434 ms), so turbo's only real drawback is gone. Caveat: `-fw` overrides the client's requested model, so blurt's `[whisper] model` is now advisory and model changes happen in the compose file. Original note follows for context: The whisperlive
   logs show `INFO:root:Loading model:` once **per connection** — a fresh model instance for
   every dictation session, because `single_model` mode only applies to a server-side custom
   model path and blurt passes the repo id per-client. With a 1.6 GB model that load is part of

@@ -79,15 +79,25 @@ reputed to have.
 
 What turbo costs, all measured:
 
-- **~800 ms slower to first partial** (≈2.2 s vs ≈1.3 s). The only cost you notice; you are
-  usually still speaking when text starts appearing.
+- ~~800 ms slower to first partial~~ — **eliminated** by pinning the model server-side (see
+  below). Turbo now reaches first partial in ~1.1s, faster than base.en managed without
+  pinning.
 - **~2.5 GB VRAM while a session is active** vs `base.en`'s ~0.5 GB. Released when the
   session ends, so it only contends with other GPU services during actual dictation.
 - 1.6 GB on disk vs 141 MB, and a slower first load after a whisperlive restart.
 
-**Reverting is one line** — set `[whisper] model = "base.en"` and
-`systemctl --user restart blurt`. Choose `base.en` if you want the fastest possible first
-partial and always dictate somewhere quiet.
+**The model is pinned server-side.** `llmbox`'s whisperlive is launched with
+`-fw deepdml/faster-whisper-large-v3-turbo-ct2` (see `command:` in
+`/home/jvogel/compose/whisperlive/docker-compose.yml`). That activates WhisperLive's
+single-model mode so one instance is reused across connections instead of being rebuilt per
+dictation — which cut time-to-first-partial from ~1.6-2.1s to a flat ~1.1s.
+
+Two consequences:
+
+- **`[whisper] model` in blurt's config is advisory.** `-fw` overrides whatever a client
+  requests. To change models, edit `command:` in that compose file and `docker compose up -d`.
+- The first dictation after a whisperlive restart pays a one-time ~1.7s model load. Every
+  session after that is ~1.1s to first partial.
 
 Avoid `small.en`: under a shorter `initial_prompt` it silently stopped transcribing after
 the first sentence of a test utterance — 20 partials instead of 43, two thirds of the words
