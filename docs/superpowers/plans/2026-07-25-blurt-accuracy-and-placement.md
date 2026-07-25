@@ -1250,7 +1250,7 @@ Run: `.venv/bin/python -c "from blurt import overlay; print(overlay._list_monito
 Expected: three `MonitorInfo` rows with `DP-4` flagged `primary=True`, and the resolved
 rect `(2560, 0, 2560, 1440)`.
 
-- [ ] **Step 14: Verify end to end**
+- [x] **Step 14: Verify end to end** — CONFIRMED by user 2026-07-25
 
 ```bash
 systemctl --user restart blurt
@@ -1283,6 +1283,29 @@ setup.
   `HotkeyListener.events()` currently drops every event where
   `keystate != key_down` (`src/blurt/hotkey.py:96`), so this needs key_up plumbing plus a
   hold-vs-tap threshold. Fully independent of Phase 1.
+
+- **Correction capture / hotword feedback loop (user request, 2026-07-25).** When blurt
+  mis-transcribes a term there is currently no way to tell it so — you have to remember the
+  term, open `~/.config/blurt/config.toml`, edit `[stt] hotwords` by hand, and restart the
+  daemon. Nothing captures the failure at the moment you notice it, which is the only moment
+  you actually have the wrong-vs-right pair in front of you.
+
+  Worth designing properly rather than guessing, but the shape of the problem:
+  - **Capture.** The overlay already holds the raw transcript, and `_last_text` survives the
+    session. An overlay-time key (alongside the existing Enter / Esc / C) could mark "this was
+    wrong" and stash the raw text for later correction. Alternatively a `blurt fix` CLI that
+    operates on the last transcript, or a tray menu entry.
+  - **Diff.** Given the wrong text and the intended text, the terms that changed can be derived
+    rather than typed — `wer.py`'s word-level edit distance (Task 2) already computes exactly
+    the substitution pairs needed, so the alignment work is largely done.
+  - **Apply.** Decide where a learned term lands: `[stt] hotwords` (decode-time, needs a daemon
+    restart to take effect), `initial_prompt` (same), or `corrections.yaml` (post-hoc, but
+    reloadable without a restart and deterministic). Probably hotwords for real words and
+    corrections.yaml for homophone-style mangles like "cube cuttle".
+  - **Reload.** Any of these is useless if it needs a manual `systemctl --user restart blurt`.
+    Watching the config/corrections files and reloading in place is likely a prerequisite.
+  - **Guard.** An unbounded auto-grown hotword list will eventually hurt accuracy — faster-whisper
+    biases toward every term given. Needs a cap, or a usage count, or a review step.
 
 - **Laptop support (last in the queue).** Today blurt only runs on jv-desktop, so dictation
   is unavailable offsite and the workflow changes. The goal is the same tap-to-dictate flow
@@ -1321,6 +1344,7 @@ Append one row per session, before clearing context.
 | Date | Task | Commit | Notes |
 |---|---|---|---|
 | 2026-07-25 | Plan authored | — | Baseline: `017c34e`, 62 tests green, working tree clean. Environment facts verified and recorded in the design doc. Discarded leftover debug logging in `overlay.py` from `017c34e`. |
+| 2026-07-25 | Recorder + user verification | (this commit) | Added `scripts/record-fixtures.sh`: Enter/speak/Enter with re-record, targets the FIFINE by node name, and validates format + level + duration per take (room tone measured at peak ~950, so the speech floor is 4000). Gotcha found: `pw-cat --record` ignores SIGINT *and* SIGTERM, so stopping escalates to SIGKILL — safe because the WAV frame count stays patched as it writes. Launched in tmux session `blurt-fixtures`. User confirmed overlay-on-primary works (Task 6 Step 14) and that GitHub/JSON/kubectl now transcribe correctly (Task 3 Step 11) — both ticked. New Phase 2 item recorded: correction-capture / hotword feedback loop. |
 | 2026-07-25 | 5 — model choice (steps 1-3) | (this commit) | llmbox prep done, no reboot needed for it. **No WhisperLive/faster-whisper upgrade required** — 0.8.0 / 1.2.0 already support everything. Both candidate models pulled (cache 605 MB -> 3.6 GB, persistent volume). **Caveat found: only ~4.8 GB VRAM free** — `mimic-server` in `mimic-tts` holds 4320 MiB of the 10240 MiB card, whisperlive only 224 MiB. Step 4 must run one model at a time; details in the step. Separately, llmbox's host `nvidia-smi` is broken (loaded module 580.159.03 vs built/userspace 580.173.02 — driver upgraded without a module reload); containers unaffected, fix is a reboot, walked the user through it. **Steps 4-8 OUTSTANDING — need fixtures from Task 4 Step 1 first.** |
 | 2026-07-25 | 6 — overlay monitor pinning | (this commit) | Done. 81 tests green, ruff clean. On the real display `preference="primary"` resolves DP-4 (x=2560) while `preference="pointer"` resolves DP-9 (x=5120) — a live demonstration of the stale-pointer bug and the fix. Rewrote `test_overlay_monitor.py` around `MonitorInfo`; note one pre-existing test (`falls_back_to_first_when_no_signal`) had been passing by accident because `MONS[0]` happened to equal DP-4's rect. Live config gained an explicit `[overlay] monitor = "primary"`. **Step 14 (dictate from 3 monitors) OUTSTANDING — needs the user.** |
 | 2026-07-25 | 4 — bench-stt (code only) | (this commit) | Bench + CLI written. Found and fixed a latent CLI bug: bench subcommands were registered with no flags, so `blurt bench-cleanup --models x` (and `bench-whisper --wav`) died at the outer parser — every bench main now takes `argv` and the outer parser forwards unrecognized args, with `add_help=False` so `--help` reaches the real parser. **Steps 1 and 6 OUTSTANDING — need the user to record `tests/fixtures/*.wav`.** Also confirmed llmbox's HF cache is the persistent named volume `whisperlive_whisperlive-cache` (Task 5 Step 1 done early). **Next: Task 6 (overlay pinning), which needs nobody.** |
