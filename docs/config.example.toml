@@ -4,7 +4,7 @@
 backend = "whisperlive"   # "whisperlive" (streaming) or "wyoming" (batch)
 host = "llmbox"
 port = 9091
-model = "base.en"         # size name or HF CTranslate2 repo id
+model = "deepdml/faster-whisper-large-v3-turbo-ct2"   # or "base.en" for ~800ms faster first partial
 use_vad = false           # NO-OP: WhisperLive takes VAD as a server launch flag
 
 [stt]

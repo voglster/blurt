@@ -1028,6 +1028,45 @@ best partial cadence (which is what makes the overlay feel live), and degrades *
 `base.en` 527 MiB, `small.en` 975 MiB. On disk: base.en 141 MB, small.en 464 MB,
 distil-large-v3.5 1.5 GB, large-v3-turbo 1.6 GB.
 
+**DECISION REVERSED 2026-07-25, same day: switched to `large-v3-turbo`.**
+
+The "stay on base.en" conclusion above rested on an untested assumption — that base.en
+"degrades gracefully" — when every measurement had been taken in a silent room with a
+close-miked Fifine. Challenged on that, the missing experiments were run: the real
+recordings noise-augmented at 20/10/5 dB SNR, and cut to 2.6-3.0 s clips (the length real
+dictation actually is, versus the 10-12 s fixtures).
+
+| SNR | base.en | large-v3-turbo |
+|---|---|---|
+| tech @ 20 dB | 0.000 | 0.000 |
+| tech @ 10 dB | 0.037 | **0.000** |
+| tech @ 5 dB | 0.111 | **0.000** |
+| mixed @ 20 dB | 0.000 | 0.000 |
+| mixed @ 10 dB | 0.000 | 0.000 |
+| mixed @ 5 dB | 0.167 | **0.083** |
+
+base.en degrades monotonically with noise; turbo holds at 0.000 until 5 dB and is still half
+the error rate there. **The graceful-degradation advantage belongs to turbo, the opposite of
+what was claimed.** The published LibriSpeech gap (10.2% vs 5.2% on test-other) reproduces on
+this user's own voice — it simply cannot surface in a quiet room.
+
+Short clips (2.6-3.0 s, clean and at 10 dB): **turbo produced no hallucination**, transcribing
+all three identically to base.en. That was the single documented argument against turbo and it
+did not reproduce.
+
+Measured costs of turbo: **~800 ms slower to first partial** (≈2.2 s vs ≈1.3 s, the only cost
+that is felt), **~2543 MiB VRAM while a session is active** vs base.en's 463 MiB — released
+when the session ends, so it contends with mimic-tts's 4.3 GB only during actual dictation —
+and 1.6 GB on disk vs 141 MB.
+
+Applied to `~/.config/blurt/config.toml` and verified: 0.000 on all clean fixtures, silence
+still clean. Reverting is one config line; the user explicitly framed this as a two-way door.
+
+**Process lesson, the important one:** the clean-room bench was not merely saturated, it was
+*misleading*. Three models tied at 0.000 and the tie was broken on latency — a conclusion that
+inverted as soon as the audio got hard. When a bench saturates, that is a signal the test
+conditions are wrong, not a signal to break the tie on a secondary axis.
+
 **If this bench is ever to rank models again it needs harder fixtures**: background noise,
 faster speech, longer utterances, disfluencies, and vocabulary deliberately left out of the
 prompt.
@@ -1038,7 +1077,7 @@ stops feeling live, which is blurt's main advantage over the OSW clones.
 
 Paste the bench table into the Progress Log along with the chosen model and the reasoning.
 
-- [x] **Step 6: Apply the winner** — NO-OP. `~/.config/blurt/config.toml` already had `model = "base.en"`, which is the measured winner. Confirmed live end-to-end after the fixture correction: mean WER 0.000 with `silence` still clean. Daemon left running.
+- [x] **Step 6: Apply the winner** — set to `deepdml/faster-whisper-large-v3-turbo-ct2` after the decision reversal below (was briefly a no-op on `base.en`). `~/.config/blurt/config.toml` already had `model = "base.en"`, which is the measured winner. Confirmed live end-to-end after the fixture correction: mean WER 0.000 with `silence` still clean. Daemon left running.
 
 Set `[whisper] model` in `~/.config/blurt/config.toml` to the winner, then:
 
@@ -1503,6 +1542,7 @@ Append one row per session, before clearing context.
 | Date | Task | Commit | Notes |
 |---|---|---|---|
 | 2026-07-25 | Plan authored | — | Baseline: `017c34e`, 62 tests green, working tree clean. Environment facts verified and recorded in the design doc. Discarded leftover debug logging in `overlay.py` from `017c34e`. |
+| 2026-07-25 | 5 — model choice REVISED | (this commit) | **Switched to `large-v3-turbo`.** The earlier "keep base.en" call rested on an untested claim that base.en degrades gracefully; all measurements had been in a silent room. Noise-augmenting the real recordings (20/10/5 dB SNR) showed base.en degrading monotonically while turbo held at 0.000 until 5 dB — the graceful-degradation advantage is turbo's, the opposite of what I wrote. Short clips (2.6-3.0 s) showed no turbo hallucination, killing the one argument against it. Costs measured: ~800 ms slower first partial, 2543 MiB VRAM while active (released after, so it only contends with mimic-tts during dictation). Verified 0.000 on clean fixtures after switching. **Lesson: a saturated bench means the test conditions are wrong, not that the tie should be broken on a secondary axis.** |
 | 2026-07-25 | 5 — model choice COMPLETE | (this commit) | **Winner: `base.en`, unchanged.** Prompting was the whole win (0.054 -> 0.000); no larger model beat it. `small.en` disqualified for deterministic silent truncation under a shorter prompt. `large-v3-turbo` is the robustness winner (0.000 even unprompted) but costs ~25% partial cadence for zero measured gain in the deployed config — flagged as the right choice for the laptop and for after correction-capture ships. Measured VRAM: base.en 527 MiB, small.en 975 MiB (idle server 827 MiB). **Two process lessons: (1) my first sweep was confounded — one shared prompt across all models measured 'models given this prompt', not the models; (2) I over-ticked checkboxes with a positional script and had to un-tick Task 5 steps 5-8. Tick deliberately, not positionally.** |
 | 2026-07-25 | 4 — fixtures recorded | (this commit) | User recorded all four takes; all validate at 16 kHz/mono/s16. Durations 10.0-12.2 s, `silence.wav` peak 180 (genuinely quiet, so it is a real hallucination check). **Levels are lowish** — peak 4274-6062, RMS 336-599; `prose.wav` only just cleared the recorder's 4000 floor. If WER is poor across *every* model, suspect mic gain before the models. 1.3 MB committed. |
 | 2026-07-25 | Recorder + user verification | (this commit) | Added `scripts/record-fixtures.sh`: Enter/speak/Enter with re-record, targets the FIFINE by node name, and validates format + level + duration per take (room tone measured at peak ~950, so the speech floor is 4000). Gotcha found: `pw-cat --record` ignores SIGINT *and* SIGTERM, so stopping escalates to SIGKILL — safe because the WAV frame count stays patched as it writes. Launched in tmux session `blurt-fixtures`. User confirmed overlay-on-primary works (Task 6 Step 14) and that GitHub/JSON/kubectl now transcribe correctly (Task 3 Step 11) — both ticked. New Phase 2 item recorded: correction-capture / hotword feedback loop. |

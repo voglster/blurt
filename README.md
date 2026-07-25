@@ -57,33 +57,43 @@ separate the candidates.
 
 ## Model selection
 
-Benchmarked 2026-07-25 on `llmbox` (RTX 3080) against four recorded fixtures, using
-`blurt bench-stt`. **Result: `base.en` with `[stt] initial_prompt` + `hotwords` set.**
+Benchmarked 2026-07-25 on `llmbox` (RTX 3080) with `blurt bench-stt` against recorded
+fixtures, then re-tested under noise and on short clips.
+**Result: `deepdml/faster-whisper-large-v3-turbo-ct2`.**
 
-| model | WER (prompted) | partials/s | on disk | VRAM |
-|---|---|---|---|---|
-| **base.en** | **0.000** | **3.7** | **141 MB** | **527 MiB** |
-| small.en | 0.000 | 3.7 | 464 MB | 975 MiB |
-| distil-large-v3.5 | 0.025 | 3.7 | 1.5 GB | — |
-| large-v3-turbo | 0.000 | 2.9 | 1.6 GB | — |
+Two findings drove it. First, **prompting matters more than model size**: with
+`[stt] initial_prompt` + `hotwords` set, `base.en` went from 0.054 WER to 0.000 on clean
+audio, and no larger model beat it there. Second, **clean-room results do not generalise** —
+adding noise to the same recordings separated the models clearly:
 
-The accuracy win came from **prompting, not model size**: `base.en` goes from 0.054
-unprompted to 0.000 prompted, and no larger model beat it. Bigger models cost partial
-cadence, which is what makes the live overlay feel live.
+| SNR | base.en | large-v3-turbo |
+|---|---|---|
+| 20 dB (quiet office) | 0.000 | 0.000 |
+| 10 dB (busy room) | 0.037 | **0.000** |
+| 5 dB (hostile) | 0.111 – 0.167 | **0.000 – 0.083** |
 
-Two caveats worth knowing before changing `model`:
+`base.en` degrades as noise rises; turbo holds at 0.000 until 5 dB and is still half the
+error rate there. Turbo is also unaffected by prompt changes (0.000 even with no prompt)
+and did not hallucinate on 2.6–3.0 s clips, clean or noisy — the one failure mode it is
+reputed to have.
 
-- **`small.en` silently truncates.** Under a shorter `initial_prompt` it stopped
-  transcribing after the first sentence of a test utterance — 20 partials instead of 43,
-  two-thirds of the words gone, no error. Deterministic, and non-monotonic (the longer
-  prompt and no prompt are both fine). Avoid it.
-- **`large-v3-turbo` needs no prompt at all** (0.000 even unprompted), which makes it the
-  better choice for noisy or offsite use where per-environment prompt tuning is impractical.
-  It is ~25% slower in partial cadence, so it is not the better desktop default.
+What turbo costs, all measured:
 
-These fixtures are clean, close-miked, read speech — the regime where small models do best.
-Published LibriSpeech WER shows the gap widening on hard audio: base.en 10.2% vs large-v3
-5.2% on test-other. Expect to want a bigger model in noisy conditions.
+- **~800 ms slower to first partial** (≈2.2 s vs ≈1.3 s). The only cost you notice; you are
+  usually still speaking when text starts appearing.
+- **~2.5 GB VRAM while a session is active** vs `base.en`'s ~0.5 GB. Released when the
+  session ends, so it only contends with other GPU services during actual dictation.
+- 1.6 GB on disk vs 141 MB, and a slower first load after a whisperlive restart.
+
+**Reverting is one line** — set `[whisper] model = "base.en"` and
+`systemctl --user restart blurt`. Choose `base.en` if you want the fastest possible first
+partial and always dictate somewhere quiet.
+
+Avoid `small.en`: under a shorter `initial_prompt` it silently stopped transcribing after
+the first sentence of a test utterance — 20 partials instead of 43, two thirds of the words
+gone, no error raised. Deterministic, and non-monotonic (both the longer prompt and no
+prompt are fine). Avoid `distil-large-v3.5` too: distil models largely ignore
+`initial_prompt`/`hotwords`, so it scored 0.025 where the others scored 0.000.
 
 ## Configuration notes
 
