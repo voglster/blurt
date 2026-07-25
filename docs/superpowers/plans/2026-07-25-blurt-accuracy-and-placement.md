@@ -562,7 +562,7 @@ initial_prompt = "Technical dictation: GitHub, GitLab, kubectl, Postgres, Postgr
 hotwords = "GitHub,GitLab,kubectl,Postgres,PostgreSQL,JSON,YAML,npm,AWS,Docker,Kubernetes,TypeScript"
 ```
 
-- [ ] **Step 11: Verify end to end by hand**
+- [x] **Step 11: Verify end to end by hand**
 
 ```bash
 systemctl --user restart blurt
@@ -574,7 +574,7 @@ runs. Then dictate into silence for ~3 seconds and confirm nothing spurious appe
 prompt-adjacent words leak in, the prompt is too list-like; shorten it to one natural
 sentence. Task 4 measures this properly; this step is the smoke test.
 
-- [ ] **Step 12: Commit**
+- [x] **Step 12: Commit**
 
 ```bash
 git add src/blurt/whisper_client.py src/blurt/config.py src/blurt/daemon.py \
@@ -643,7 +643,7 @@ Also record `silence.wav` (~3 s of room tone, say nothing) with an empty `silenc
 It is the hallucination check: with an `initial_prompt` set, Whisper will sometimes emit
 prompt-adjacent text when given nothing to transcribe.
 
-- [ ] **Step 2: Write the bench**
+- [x] **Step 2: Write the bench**
 
 Create `src/blurt/bench/stt_bench.py`:
 
@@ -783,7 +783,7 @@ def main() -> int:
     return 0
 ```
 
-- [ ] **Step 3: Register the subcommand**
+- [x] **Step 3: Register the subcommand**
 
 In `src/blurt/cli.py`, after the `bench-cleanup` parser line, add:
 
@@ -799,13 +799,13 @@ and after the `bench-cleanup` dispatch block:
         return bench()
 ```
 
-- [ ] **Step 4: Verify the CLI wiring without touching the network**
+- [x] **Step 4: Verify the CLI wiring without touching the network**
 
 Run: `.venv/bin/python -m blurt bench-stt --help`
 Expected: usage text listing `--host`, `--port`, `--models`, `--fixtures`,
 `--initial-prompt`, `--hotwords`.
 
-- [ ] **Step 5: Verify fixture discovery fails loudly**
+- [x] **Step 5: Verify fixture discovery fails loudly**
 
 Run: `.venv/bin/python -m blurt bench-stt --fixtures /tmp/nope`
 Expected: exits with `no <name>.wav + <name>.txt pairs in /tmp/nope`.
@@ -850,12 +850,14 @@ Config-and-operations only — no application code changes.
 - Modify: `docs/config.example.toml`
 - Modify: `README.md`
 
-- [ ] **Step 1: Confirm the model cache is a persistent volume**
+- [x] **Step 1: Confirm the model cache is a persistent volume** — DONE 2026-07-25
 
-Run: `ssh llmbox 'docker inspect whisperlive --format "{{json .Mounts}}"'`
-Expected: a bind or named volume covering the HuggingFace cache. If the cache lives only
-in the container filesystem, a 1.5 GB pull is lost on the next `docker rm`, and a volume
-must be added before continuing.
+Verified: named volume `whisperlive_whisperlive-cache` is mounted at `/root/.cache`, so
+the HuggingFace cache (605 MB today) survives `docker rm`. Compose file lives on llmbox at
+`/home/jvogel/compose/whisperlive/docker-compose.yml` and passes no server flags, so
+WhisperLive's own defaults apply. **No WhisperLive or faster-whisper upgrade is needed** —
+0.8.0 / 1.2.0 already support `initial_prompt`, `hotwords`, and large-v3-turbo. The only
+llmbox-side change required is pulling model files (Step 2).
 
 - [ ] **Step 2: Pre-pull the candidate models**
 
@@ -1299,6 +1301,7 @@ Append one row per session, before clearing context.
 | Date | Task | Commit | Notes |
 |---|---|---|---|
 | 2026-07-25 | Plan authored | — | Baseline: `017c34e`, 62 tests green, working tree clean. Environment facts verified and recorded in the design doc. Discarded leftover debug logging in `overlay.py` from `017c34e`. |
+| 2026-07-25 | 4 — bench-stt (code only) | (this commit) | Bench + CLI written. Found and fixed a latent CLI bug: bench subcommands were registered with no flags, so `blurt bench-cleanup --models x` (and `bench-whisper --wav`) died at the outer parser — every bench main now takes `argv` and the outer parser forwards unrecognized args, with `add_help=False` so `--help` reaches the real parser. **Steps 1 and 6 OUTSTANDING — need the user to record `tests/fixtures/*.wav`.** Also confirmed llmbox's HF cache is the persistent named volume `whisperlive_whisperlive-cache` (Task 5 Step 1 done early). **Next: Task 6 (overlay pinning), which needs nobody.** |
 | 2026-07-25 | 3 — initial_prompt + hotwords | (this commit) | Code + config + daemon wiring done; 72 tests green, ruff clean. Live `~/.config/blurt/config.toml` gained an `[stt]` block and the daemon was restarted. **Step 11 (dictate-and-check, incl. the silence hallucination check) is still OUTSTANDING — needs the user at the keyboard.** Task 4 step 6 measures the same thing properly. **Next: Task 4 (bench-stt), which needs fixture recordings from the user first.** |
 | 2026-07-25 | 2 — WER helper | (this commit) | Done, no surprises. 68 tests green (62 -> 68), ruff clean. **Next: Task 3 (initial_prompt + hotwords).** |
 | 2026-07-25 | 1 — Documentation truth-up | (this commit) | Done. Two things not in the plan: (a) the tree was not ruff-clean at baseline — 4 pre-existing F401/F841 in `whisper_bench.py`, `whisper_client.py`, `test_config.py`, `test_whisper_client.py` — fixed here so later tasks inherit a passing gate; (b) added `docs/corrections.example.yaml`, since the README told you to create `~/.config/blurt/corrections.yaml` with no example to copy. 62 tests green, ruff clean. **Next: Task 2 (WER helper).** |

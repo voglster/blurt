@@ -53,8 +53,8 @@ async def _run(host: str, port: int, models: list[str], timeout_ms: int) -> None
         await _bench_model(host, port, model, timeout_ms)
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser()
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(prog="blurt bench-cleanup")
     parser.add_argument("--host", default="llmbox")
     parser.add_argument("--port", type=int, default=11434)
     parser.add_argument(
@@ -63,6 +63,6 @@ def main() -> int:
         default=["qwen2.5:1.5b", "llama3.2:1b", "phi3:mini"],
     )
     parser.add_argument("--timeout-ms", type=int, default=5000)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     asyncio.run(_run(args.host, args.port, args.models, args.timeout_ms))
     return 0

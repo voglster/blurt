@@ -43,8 +43,8 @@ async def _run(host: str, port: int, wav: Path) -> None:
     print(f"\n{n_partial} partials, final latency {(time.perf_counter() - t0) * 1000:.1f} ms total")
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser()
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(prog="blurt bench-whisper")
     parser.add_argument("--host", default="llmbox")
     parser.add_argument("--port", type=int, default=10300)
     parser.add_argument(
@@ -52,6 +52,6 @@ def main() -> int:
         type=Path,
         default=Path(__file__).parent.parent.parent.parent / "tests" / "fixtures" / "sample.wav",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     asyncio.run(_run(args.host, args.port, args.wav))
     return 0

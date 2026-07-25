@@ -31,12 +31,21 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="blurt")
     sub = parser.add_subparsers(dest="cmd", required=True)
     sub.add_parser("run", help="Run the daemon")
-    sub.add_parser("bench-whisper", help="Benchmark Wyoming whisper latency")
-    sub.add_parser("bench-cleanup", help="Benchmark Ollama cleanup latency")
+    # add_help=False so `blurt bench-x --help` reaches the bench's own parser,
+    # which is the one that knows the flags.
+    sub.add_parser("bench-whisper", help="Benchmark Wyoming whisper latency", add_help=False)
+    sub.add_parser("bench-cleanup", help="Benchmark Ollama cleanup latency", add_help=False)
+    sub.add_parser(
+        "bench-stt", help="Benchmark WhisperLive models on latency + WER", add_help=False
+    )
 
-    args = parser.parse_args(argv)
+    # Bench subcommands own their own flags, so anything this parser doesn't
+    # recognize is forwarded to them rather than rejected here.
+    args, extra = parser.parse_known_args(argv)
 
     if args.cmd == "run":
+        if extra:
+            parser.error(f"unrecognized arguments: {' '.join(extra)}")
         lock_fd = _acquire_singleton_lock()
         if lock_fd is None:
             try:
@@ -57,10 +66,13 @@ def main(argv: list[str] | None = None) -> int:
             os.close(lock_fd)
     if args.cmd == "bench-whisper":
         from blurt.bench.whisper_bench import main as bench
-        return bench()
+        return bench(extra)
     if args.cmd == "bench-cleanup":
         from blurt.bench.cleanup_bench import main as bench
-        return bench()
+        return bench(extra)
+    if args.cmd == "bench-stt":
+        from blurt.bench.stt_bench import main as bench
+        return bench(extra)
     return 1
 
 
