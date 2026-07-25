@@ -603,7 +603,7 @@ tell us nothing about the microphone, room, and accent the models actually face.
 - Consumes: `wer.wer` (Task 2); `WhisperLiveServer(..., initial_prompt=, hotwords=)` (Task 3); `whisper_client.WhisperSession`.
 - Produces: `bench.stt_bench.main() -> int`, registered as the `bench-stt` subcommand.
 
-- [ ] **Step 1: Record the fixtures**
+- [x] **Step 1: Record the fixtures** — DONE 2026-07-25 via `scripts/record-fixtures.sh`
 
 `tests/fixtures/` does not exist. Create it and record three clips, reading each script
 aloud at a normal dictation pace:
@@ -823,13 +823,13 @@ to empty or near-empty text. Record both numbers in the Progress Log — this is
 evidence that Task 3 was worth doing, and if WER does *not* drop, say so rather than
 assuming it did.
 
-- [ ] **Step 7: Run the full suite and linter**
+- [x] **Step 7: Run the full suite and linter** — 81 passed, ruff clean
 
 Run: `.venv/bin/python -m pytest -q && .venv/bin/python -m ruff check src tests`
 Expected: green and clean. The bench itself has no unit tests — it is an I/O-bound
 measurement tool whose only logic, WER, is tested in Task 2.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 Add `tests/fixtures/*.wav` deliberately — they are small and make the bench reproducible.
 Check `.gitignore` does not exclude them first: `grep -n "wav\|fixtures" .gitignore`
@@ -1344,6 +1344,7 @@ Append one row per session, before clearing context.
 | Date | Task | Commit | Notes |
 |---|---|---|---|
 | 2026-07-25 | Plan authored | — | Baseline: `017c34e`, 62 tests green, working tree clean. Environment facts verified and recorded in the design doc. Discarded leftover debug logging in `overlay.py` from `017c34e`. |
+| 2026-07-25 | 4 — fixtures recorded | (this commit) | User recorded all four takes; all validate at 16 kHz/mono/s16. Durations 10.0-12.2 s, `silence.wav` peak 180 (genuinely quiet, so it is a real hallucination check). **Levels are lowish** — peak 4274-6062, RMS 336-599; `prose.wav` only just cleared the recorder's 4000 floor. If WER is poor across *every* model, suspect mic gain before the models. 1.3 MB committed. |
 | 2026-07-25 | Recorder + user verification | (this commit) | Added `scripts/record-fixtures.sh`: Enter/speak/Enter with re-record, targets the FIFINE by node name, and validates format + level + duration per take (room tone measured at peak ~950, so the speech floor is 4000). Gotcha found: `pw-cat --record` ignores SIGINT *and* SIGTERM, so stopping escalates to SIGKILL — safe because the WAV frame count stays patched as it writes. Launched in tmux session `blurt-fixtures`. User confirmed overlay-on-primary works (Task 6 Step 14) and that GitHub/JSON/kubectl now transcribe correctly (Task 3 Step 11) — both ticked. New Phase 2 item recorded: correction-capture / hotword feedback loop. |
 | 2026-07-25 | 5 — model choice (steps 1-3) | (this commit) | llmbox prep done, no reboot needed for it. **No WhisperLive/faster-whisper upgrade required** — 0.8.0 / 1.2.0 already support everything. Both candidate models pulled (cache 605 MB -> 3.6 GB, persistent volume). **Caveat found: only ~4.8 GB VRAM free** — `mimic-server` in `mimic-tts` holds 4320 MiB of the 10240 MiB card, whisperlive only 224 MiB. Step 4 must run one model at a time; details in the step. Separately, llmbox's host `nvidia-smi` is broken (loaded module 580.159.03 vs built/userspace 580.173.02 — driver upgraded without a module reload); containers unaffected, fix is a reboot, walked the user through it. **Steps 4-8 OUTSTANDING — need fixtures from Task 4 Step 1 first.** |
 | 2026-07-25 | 6 — overlay monitor pinning | (this commit) | Done. 81 tests green, ruff clean. On the real display `preference="primary"` resolves DP-4 (x=2560) while `preference="pointer"` resolves DP-9 (x=5120) — a live demonstration of the stale-pointer bug and the fix. Rewrote `test_overlay_monitor.py` around `MonitorInfo`; note one pre-existing test (`falls_back_to_first_when_no_signal`) had been passing by accident because `MONS[0]` happened to equal DP-4's rect. Live config gained an explicit `[overlay] monitor = "primary"`. **Step 14 (dictate from 3 monitors) OUTSTANDING — needs the user.** |

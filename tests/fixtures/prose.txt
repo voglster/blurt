@@ -1,0 +1,1 @@
+I think the right move here is to ship the smaller change first, measure how it behaves for a week, and only then decide whether the larger refactor is worth the risk.
