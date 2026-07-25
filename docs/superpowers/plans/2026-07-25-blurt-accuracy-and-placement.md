@@ -1474,6 +1474,28 @@ setup.
   on: `Daemon._finalize` snapshots the overlay text and never waits for the official final.
   Task 5's "median final under 1500 ms" selection rule is meaningless until this is fixed.
 
+- **Time-to-first-partial has an architectural floor of ~1s, and blurt is already on it
+  (established 2026-07-25).** After pinning the model server-side, first partial dropped to a
+  flat ~1.1s — and the user reported **no perceptible difference** in live dictation. That is
+  the correct outcome to expect, for a measurable reason: base.en (74M params) and
+  large-v3-turbo (809M) both reach first partial at ~1.1s once resident. An 11x parameter gap
+  producing identical latency proves inference is not the limiter. WhisperLive's STT loop does
+  not process audio until >=1s is buffered (noted in `WhisperLiveServer`'s docstring), so ~1s
+  is a floor no model choice can beat.
+
+  **Do not attempt to improve perceived dictation latency by changing models.** If it is ever
+  worth attacking, the remaining costs are, in rough order:
+  1. The server-side >=1s buffer. Not client-configurable; needs a change inside the
+     WhisperLive container.
+  2. Session startup on the critical path — `AudioCapture.start()` spawns a `pw-cat`
+     subprocess and `_resolve_monitor` shells out to `xrandr` on every dictate. A persistent
+     WebSocket and/or a long-lived capture process would move the handshake off the hot path.
+  3. Human timing, which dominates all of the above and cannot be optimised.
+
+  Measure before touching any of it: instrument from keypress to first overlay text, which is
+  the number the user actually experiences. `bench-stt` measures from stream start and so
+  misses items 2 and 3 entirely.
+
 - **Hotword bleed is real, and the guard caught it (2026-07-25).** Live tuning of the user's
   vocabulary produced a concrete instance of the over-biasing risk. Growing `hotwords` from 12
   to 29 terms — adding `Claude`, `Claude Code`, `Sherpa`, `FleetView`, `PyPI` and others —

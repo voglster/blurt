@@ -92,6 +92,14 @@ What turbo costs, all measured:
 single-model mode so one instance is reused across connections instead of being rebuilt per
 dictation — which cut time-to-first-partial from ~1.6-2.1s to a flat ~1.1s.
 
+**Do not expect to feel this.** ~1.1s appears to be an architectural floor, not a model
+limit: WhisperLive's STT loop does not process audio until >=1s is buffered, and base.en
+(74M params) and large-v3-turbo (809M) both reach first partial at ~1.1s once the model is
+resident. An 11x parameter difference producing identical latency means inference is not the
+limiter. Pinning removed the only slack that existed; in live use the floor is further
+dwarfed by the time it takes to start speaking. The value of turbo is noise robustness, not
+speed.
+
 Two consequences:
 
 - **`[whisper] model` in blurt's config is advisory.** `-fw` overrides whatever a client
