@@ -1474,6 +1474,39 @@ setup.
   on: `Daemon._finalize` snapshots the overlay text and never waits for the official final.
   Task 5's "median final under 1500 ms" selection rule is meaningless until this is fixed.
 
+- **Hotword bleed is real, and the guard caught it (2026-07-25).** Live tuning of the user's
+  vocabulary produced a concrete instance of the over-biasing risk. Growing `hotwords` from 12
+  to 29 terms — adding `Claude`, `Claude Code`, `Sherpa`, `FleetView`, `PyPI` and others —
+  regressed the bench from 0.000 to 0.009, because with both `TypeScript` and `JavaScript`
+  boosted the model **inserted a word that was never spoken**:
+
+  ```
+  REF: ... The TypeScript types were wrong ...
+  HYP: ... The TypeScript. JavaScript types were wrong ...
+  ```
+
+  Trimming to 18 terms — only those actually observed to mis-transcribe — restored 0.000.
+
+  **The rule this establishes:** `initial_prompt` is soft context and can be generous;
+  `hotwords` are hard token boosts and must be restricted to terms that demonstrably fail.
+  Terms that already transcribe correctly cost accuracy when boosted, for no benefit. This is
+  exactly the failure mode the correction-capture feature would cause if it appended terms
+  without measuring, and it validates making a `bench-stt` re-run mandatory before persisting
+  any prompt or hotword change.
+
+  Also note `Claude` and `cloud` are near-homophones and both are in this user's vocabulary, so
+  the prompt names both in natural context rather than boosting only one.
+
+- **Pin the model server-side to recover first-partial latency (2026-07-25).** The whisperlive
+  logs show `INFO:root:Loading model:` once **per connection** — a fresh model instance for
+  every dictation session, because `single_model` mode only applies to a server-side custom
+  model path and blurt passes the repo id per-client. With a 1.6 GB model that load is part of
+  the ~800 ms first-partial cost. Launching the container with
+  `-fw <path-to-turbo> --single_model` should pin one instance and reuse it. This is an llmbox
+  compose change (`/home/jvogel/compose/whisperlive/docker-compose.yml`), not a blurt change,
+  and it would make turbo's main drawback largely disappear. Measure first-partial before and
+  after with `bench-stt`.
+
 - **Correction capture / hotword feedback loop (user request, 2026-07-25).** When blurt
   mis-transcribes a term there is currently no way to tell it so — you have to remember the
   term, open `~/.config/blurt/config.toml`, edit `[stt] hotwords` by hand, and restart the
@@ -1542,6 +1575,7 @@ Append one row per session, before clearing context.
 | Date | Task | Commit | Notes |
 |---|---|---|---|
 | 2026-07-25 | Plan authored | — | Baseline: `017c34e`, 62 tests green, working tree clean. Environment facts verified and recorded in the design doc. Discarded leftover debug logging in `overlay.py` from `017c34e`. |
+| 2026-07-25 | Live tuning on turbo | (this commit) | Confirmed from whisperlive logs that turbo is genuinely loaded (`models--deepdml--...`), not silently falling back. User reported the trailing-artifact annoyances are gone. Live dictation exposed missing vocabulary (`Claude Code` came out as "CloudCode"); expanded hotwords 12 -> 29, which **regressed the bench 0.000 -> 0.009 via hotword bleed** (boosting both TypeScript and JavaScript made the model insert an unspoken "JavaScript"). Trimmed to 18 demonstrated-failure terms, back to 0.000, applied and restarted. Rule: generous prompt, lean hotwords. Also found whisperlive reloads the model per connection — pinning it server-side should recover much of turbo's first-partial cost. |
 | 2026-07-25 | 5 — model choice REVISED | (this commit) | **Switched to `large-v3-turbo`.** The earlier "keep base.en" call rested on an untested claim that base.en degrades gracefully; all measurements had been in a silent room. Noise-augmenting the real recordings (20/10/5 dB SNR) showed base.en degrading monotonically while turbo held at 0.000 until 5 dB — the graceful-degradation advantage is turbo's, the opposite of what I wrote. Short clips (2.6-3.0 s) showed no turbo hallucination, killing the one argument against it. Costs measured: ~800 ms slower first partial, 2543 MiB VRAM while active (released after, so it only contends with mimic-tts during dictation). Verified 0.000 on clean fixtures after switching. **Lesson: a saturated bench means the test conditions are wrong, not that the tie should be broken on a secondary axis.** |
 | 2026-07-25 | 5 — model choice COMPLETE | (this commit) | **Winner: `base.en`, unchanged.** Prompting was the whole win (0.054 -> 0.000); no larger model beat it. `small.en` disqualified for deterministic silent truncation under a shorter prompt. `large-v3-turbo` is the robustness winner (0.000 even unprompted) but costs ~25% partial cadence for zero measured gain in the deployed config — flagged as the right choice for the laptop and for after correction-capture ships. Measured VRAM: base.en 527 MiB, small.en 975 MiB (idle server 827 MiB). **Two process lessons: (1) my first sweep was confounded — one shared prompt across all models measured 'models given this prompt', not the models; (2) I over-ticked checkboxes with a positional script and had to un-tick Task 5 steps 5-8. Tick deliberately, not positionally.** |
 | 2026-07-25 | 4 — fixtures recorded | (this commit) | User recorded all four takes; all validate at 16 kHz/mono/s16. Durations 10.0-12.2 s, `silence.wav` peak 180 (genuinely quiet, so it is a real hallucination check). **Levels are lowish** — peak 4274-6062, RMS 336-599; `prose.wav` only just cleared the recorder's 4000 floor. If WER is poor across *every* model, suspect mic gain before the models. 1.3 MB committed. |
