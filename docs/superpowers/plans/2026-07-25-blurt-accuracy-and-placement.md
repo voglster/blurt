@@ -810,7 +810,26 @@ Expected: usage text listing `--host`, `--port`, `--models`, `--fixtures`,
 Run: `.venv/bin/python -m blurt bench-stt --fixtures /tmp/nope`
 Expected: exits with `no <name>.wav + <name>.txt pairs in /tmp/nope`.
 
-- [ ] **Step 6: Measure whether prompting actually helps**
+- [x] **Step 6: Measure whether prompting actually helps** — MEASURED 2026-07-25: YES, 5.4x
+
+| fixture | unprompted WER | prompted WER |
+|---|---|---|
+| mixed | 0.056 | **0.000** |
+| prose | 0.031 | **0.000** |
+| tech | 0.107 | **0.036** |
+| silence | `''` | `''` |
+| **mean** | **0.065** | **0.012** |
+
+Same model (`base.en`), same fixtures. Unprompted failures were exactly the ones
+`corrections.yaml` exists to patch: `kubectl` -> "cube control", `GitHub` -> "github",
+`in CI` -> "NCI". Prompted, `mixed` and `prose` are word-perfect and the only remaining
+`tech` error is a dropped article ("for YAML parse error"), not a vocabulary miss.
+
+**The hallucination risk did not materialize**: `silence.wav` returns `''` with the prompt
+active, so the design doc's main concern about `initial_prompt` is retired.
+
+Consequence for Task 5: at 0.012 there is very little headroom for a bigger model to win,
+and a bigger model costs partial cadence. Do not assume the largest model wins.
 
 ```bash
 .venv/bin/python -m blurt bench-stt --models base.en
