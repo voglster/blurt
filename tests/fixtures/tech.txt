@@ -1,1 +1,1 @@
-Open GitHub and clone the repo, then run kubectl apply against the staging cluster and check the JSON output for a YAML parse error in the Postgres config.
+Open GitHub and clone the repo, then run kubectl apply against the staging cluster and check the JSON output for YAML parse error in the Postgres config.

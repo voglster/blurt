@@ -810,26 +810,31 @@ Expected: usage text listing `--host`, `--port`, `--models`, `--fixtures`,
 Run: `.venv/bin/python -m blurt bench-stt --fixtures /tmp/nope`
 Expected: exits with `no <name>.wav + <name>.txt pairs in /tmp/nope`.
 
-- [x] **Step 6: Measure whether prompting actually helps** — MEASURED 2026-07-25: YES, 5.4x
+- [x] **Step 6: Measure whether prompting actually helps** — MEASURED 2026-07-25: YES, 0.054 -> 0.000
 
 | fixture | unprompted WER | prompted WER |
 |---|---|---|
 | mixed | 0.056 | **0.000** |
 | prose | 0.031 | **0.000** |
-| tech | 0.107 | **0.036** |
+| tech | 0.074 | **0.000** |
 | silence | `''` | `''` |
-| **mean** | **0.065** | **0.012** |
+| **mean** | **0.054** | **0.000** |
+
+**These are the corrected numbers.** The first run of this bench scored `tech` against a
+reference containing "for **a** YAML parse error". The recorded take omits the "a" — the user
+confirmed by listening, and all five benchmarked models transcribed it without the article.
+`tech.txt` and `script_for tech` in the recorder were corrected to match the audio, which
+moved prompted `tech` from 0.036 to 0.000.
 
 Same model (`base.en`), same fixtures. Unprompted failures were exactly the ones
 `corrections.yaml` exists to patch: `kubectl` -> "cube control", `GitHub` -> "github",
-`in CI` -> "NCI". Prompted, `mixed` and `prose` are word-perfect and the only remaining
-`tech` error is a dropped article ("for YAML parse error"), not a vocabulary miss.
+`in CI` -> "NCI". Prompted, **all three scored fixtures are word-perfect**.
 
 **The hallucination risk did not materialize**: `silence.wav` returns `''` with the prompt
 active, so the design doc's main concern about `initial_prompt` is retired.
 
-Consequence for Task 5: at 0.012 there is very little headroom for a bigger model to win,
-and a bigger model costs partial cadence. Do not assume the largest model wins.
+Consequence for Task 5: at 0.000 there is **no** headroom for a bigger model to win on these
+fixtures, and a bigger model costs partial cadence. Do not assume the largest model wins.
 
 ```bash
 .venv/bin/python -m blurt bench-stt --models base.en
@@ -918,14 +923,70 @@ done
 If a run OOMs, `docker restart whisperlive` to reclaim, and consider stopping `mimic-tts`
 for the duration of the bench to free its 4.3 GB.
 
-- [ ] **Step 4: Run the bench across all four candidates**
+- [x] **Step 4: Run the bench across all four candidates** — DONE 2026-07-25, one model at a time. VRAM held flat throughout, so models did not accumulate and the OOM concern was unfounded.
 
 Run: `.venv/bin/python -m blurt bench-stt 2>&1 | tee /tmp/bench-stt.txt`
 Expected: a `mean WER` and `median final` line per model. The first connection to each
 newly pulled model includes a one-time model load; if a model's first fixture looks
 anomalous, re-run that model alone.
 
-- [x] **Step 5: Pick the winner and record the evidence**
+- [x] **Step 5: Pick the winner and record the evidence** — WINNER: `base.en`, unchanged
+
+Scored on tail latency (`final_ms - audio_duration`), not raw `final_ms`, which includes the
+fixture's real-time playback. All rows prompted except the first. WER uses the corrected
+`tech` reference.
+
+| run | mean WER | tail p50 | partials/s | on disk | silence |
+|---|---|---|---|---|---|
+| base.en unprompted | 0.054 | 1531 ms | 4.2 | 141 MB | clean |
+| **base.en prompted** | **0.000** | **1483 ms** | **3.7** | **141 MB** | clean |
+| small.en | 0.000 | 1766 ms | 3.7 | 464 MB | clean |
+| distil-large-v3.5-ct2 | 0.025 | 2698 ms | 3.7 | 1.5 GB | clean |
+| large-v3-turbo-ct2 | 0.000 | 2186 ms | 2.9 | 1.6 GB | clean |
+
+Three models tie at word-perfect, so **accuracy cannot pick a winner here**. `base.en` wins on
+the axes that still discriminate: the best tail latency, the most partials per second, and a
+model 11x smaller than turbo. **The model does not change.** The accuracy win came entirely
+from Task 3's prompting, not from model size.
+
+**This overturns the original ranking**, which put the model upgrade at #2 and prompting at #3.
+Recorded so nobody re-litigates it: bigger was not better here.
+
+**Read this bench honestly — it is saturated.** Three-way perfection means zero resolving
+power. The conditions were quiet room (room tone peak 180), close-miked Fifine, native accent,
+*read* speech, and technical vocabulary pre-declared in the prompt. That is exactly the regime
+where base.en's weaknesses do not surface. Published WER on LibriSpeech shows what is being
+given up as conditions get harder:
+
+| model | params | test-clean | test-other (hard) |
+|---|---|---|---|
+| base.en | 74M | 4.2% | **10.2%** |
+| small.en | 244M | 3.1% | 7.4% |
+| large-v3 (turbo shares the encoder) | 809M | 2.7% | **5.2%** |
+
+Roughly a 2x gap on hard audio, a modest one on clean. Where the bigger models win, per the
+literature: noisy environments (small models degrade faster; large-v3 was trained on noisier
+samples), accented speech, rare proper nouns, and long or disfluent speech. Note that the
+documented mitigation for the proper-noun case is precisely `initial_prompt` + `hotwords`,
+which is already deployed — so much of that particular gap is already bought.
+
+Counterpoint against reaching for turbo by default: it is reported to hallucinate *more* than
+full large-v3 on very short clips and noisy recordings, and dictation is short clips.
+
+`distil-large-v3.5` losing at 0.025 is documented behavior, not a fluke: distil-whisper states
+`initial_prompt` has little effect on it, because distil-large-v3 was trained with prompt
+conditioning on only 50% of samples. Its `tech` WER of 0.074 exactly equals base.en
+**unprompted**. Do not use a distil model while prompting is load-bearing.
+
+Sources: Whisper paper (arxiv 2212.04356), huggingface/distil-whisper issue #20.
+
+**Implication for the laptop (Phase 2):** offsite means cafes, hotel wifi and ambient noise —
+the exact conditions where base.en gives up the most. The laptop may want a different model
+than the desktop, which strengthens the per-host config-divergence question.
+
+**If this bench is ever to rank models again it needs harder fixtures**: background noise,
+faster speech, longer utterances, disfluencies, and vocabulary deliberately left out of the
+prompt.
 
 Selection rule: the lowest mean WER whose **median final** stays under 1500 ms and which
 still produces multiple partials per fixture — sparse partials mean the live overlay
@@ -933,7 +994,7 @@ stops feeling live, which is blurt's main advantage over the OSW clones.
 
 Paste the bench table into the Progress Log along with the chosen model and the reasoning.
 
-- [x] **Step 6: Apply the winner**
+- [x] **Step 6: Apply the winner** — NO-OP. `~/.config/blurt/config.toml` already had `model = "base.en"`, which is the measured winner. Confirmed live end-to-end after the fixture correction: mean WER 0.000 with `silence` still clean. Daemon left running.
 
 Set `[whisper] model` in `~/.config/blurt/config.toml` to the winner, then:
 
@@ -944,13 +1005,13 @@ Dictate three real sentences containing technical terms and confirm the overlay 
 fills in while you speak. If partials feel noticeably sparser than before, revert the one
 config line and pick the runner-up.
 
-- [x] **Step 7: Update docs with the measured result**
+- [ ] **Step 7: Update docs with the measured result**
 
 Update `docs/config.example.toml`'s `model` line to the winner, and add a short "Model
 selection" section to the README naming the winner, its mean WER, its median final
 latency, and the date measured — so the next reader does not re-litigate it.
 
-- [x] **Step 8: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
 git add docs/config.example.toml README.md

@@ -18,14 +18,22 @@ SPEECH_MIN_PEAK=4000
 
 BOLD=$'\e[1m'; DIM=$'\e[2m'; RED=$'\e[31m'; GREEN=$'\e[32m'; YELLOW=$'\e[33m'; OFF=$'\e[0m'
 
-# Fixture scripts. The .txt reference is written from these, so the text you read
-# and the text WER scores against can never drift apart.
+# Fixture scripts. The .txt reference is written from these on every run, so the text
+# you read and the text WER scores against can never drift apart.
+#
+# IMPORTANT: that also means editing tests/fixtures/<name>.txt by hand is pointless —
+# the next re-record overwrites it. If you misread a line and want to keep the take,
+# correct the text HERE instead, so script and reference stay in sync.
+#
+# The `tech` line deliberately reads "for YAML parse error" without the article: on
+# 2026-07-25 the recorded take omitted the "a", confirmed by listening, and all five
+# benchmarked models transcribed it that way. The reference matches the audio.
 names=(tech prose mixed silence)
 
 script_for() {
     case "$1" in
     tech) cat <<'EOF'
-Open GitHub and clone the repo, then run kubectl apply against the staging cluster and check the JSON output for a YAML parse error in the Postgres config.
+Open GitHub and clone the repo, then run kubectl apply against the staging cluster and check the JSON output for YAML parse error in the Postgres config.
 EOF
         ;;
     prose) cat <<'EOF'
