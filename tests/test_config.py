@@ -90,3 +90,14 @@ def test_stt_overrides(tmp_path):
     cfg = load(p)
     assert cfg.stt.initial_prompt == "kubectl"
     assert cfg.stt.hotwords == "kubectl,JSON"
+
+
+def test_overlay_monitor_defaults_to_primary(tmp_path):
+    cfg = load(tmp_path / "missing.toml")
+    assert cfg.overlay.monitor == "primary"
+
+
+def test_overlay_monitor_override(tmp_path):
+    p = tmp_path / "config.toml"
+    p.write_text('[overlay]\nmonitor = "DP-4"\n')
+    assert load(p).overlay.monitor == "DP-4"

@@ -55,6 +55,7 @@ class OverlayConfig:
     max_height_fraction: float = 0.33
     opacity: float = 0.85
     font: str = "monospace 18"
+    monitor: str = "primary"   # "primary", an output name (e.g. "DP-4"), or "pointer"
 
 
 @dataclass(frozen=True)

@@ -91,6 +91,7 @@ class Daemon:
             max_height_fraction=self._cfg.overlay.max_height_fraction,
             opacity=self._cfg.overlay.opacity,
             font=self._cfg.overlay.font,
+            monitor=self._cfg.overlay.monitor,
         ))
         self._tray = (
             Tray(

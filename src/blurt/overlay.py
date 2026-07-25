@@ -7,12 +7,49 @@ import subprocess
 import threading
 import tkinter as tk
 from dataclasses import dataclass
+from typing import NamedTuple
 
 log = logging.getLogger(__name__)
 
 
-def _list_monitors() -> list[tuple[int, int, int, int]]:
-    """Return [(x, y, w, h), ...] for every monitor via xrandr --listmonitors."""
+class MonitorInfo(NamedTuple):
+    name: str
+    primary: bool
+    x: int
+    y: int
+    w: int
+    h: int
+
+
+_MONITOR_LINE = re.compile(
+    r"^\s*\d+:\s+\+(?P<primary>\*?)(?P<name>\S+)\s+"
+    r"(?P<w>\d+)/\d+x(?P<h>\d+)/\d+\+(?P<x>-?\d+)\+(?P<y>-?\d+)"
+)
+
+
+def _parse_listmonitors(output: str) -> list[MonitorInfo]:
+    """Parse `xrandr --listmonitors`. Lines look like:
+
+        0: +*DP-4 2560/700x1440/390+2560+0  DP-4
+
+    The leading `+` marks an active monitor and `*` marks the primary one.
+    """
+    monitors: list[MonitorInfo] = []
+    for line in output.splitlines():
+        m = _MONITOR_LINE.match(line)
+        if m:
+            monitors.append(MonitorInfo(
+                name=m.group("name"),
+                primary=bool(m.group("primary")),
+                x=int(m.group("x")),
+                y=int(m.group("y")),
+                w=int(m.group("w")),
+                h=int(m.group("h")),
+            ))
+    return monitors
+
+
+def _list_monitors_detailed() -> list[MonitorInfo]:
     try:
         out = subprocess.run(
             ["xrandr", "--listmonitors"],
@@ -21,15 +58,12 @@ def _list_monitors() -> list[tuple[int, int, int, int]]:
     except (subprocess.SubprocessError, FileNotFoundError) as exc:
         log.warning("xrandr --listmonitors failed: %s", exc)
         return []
-    monitors: list[tuple[int, int, int, int]] = []
-    # Line shape: " 0: +*HDMI-1 1920/520x1080/290+0+0  HDMI-1"
-    pat = re.compile(r"(\d+)/\d+x(\d+)/\d+\+(-?\d+)\+(-?\d+)")
-    for line in out.splitlines():
-        m = pat.search(line)
-        if m:
-            w, h, x, y = (int(v) for v in m.groups())
-            monitors.append((x, y, w, h))
-    return monitors
+    return _parse_listmonitors(out)
+
+
+def _list_monitors() -> list[tuple[int, int, int, int]]:
+    """Return [(x, y, w, h), ...] for every monitor."""
+    return [(m.x, m.y, m.w, m.h) for m in _list_monitors_detailed()]
 
 
 def _window_rect(window_id: int) -> tuple[int, int, int, int] | None:
@@ -93,16 +127,38 @@ def _monitor_containing(
     return None
 
 
-def _resolve_monitor(window_id: int | None) -> tuple[int, int, int, int] | None:
+def _resolve_monitor(
+    window_id: int | None, preference: str = "primary"
+) -> tuple[int, int, int, int] | None:
     """Pick the monitor to show the overlay on.
 
-    Prefer the monitor under the target window's center (X11, where we have a
-    window id); otherwise fall back to the monitor under the pointer (Wayland,
-    where window_id is None). Last resort is the first monitor.
+    `preference` is an output name, "primary", or "pointer". Pointer resolution is
+    only trustworthy on X11: under XWayland, XQueryPointer reports the pointer only
+    while it sits over an X11 surface, so on a mostly-Wayland desktop it returns a
+    stale position and the overlay lands on an arbitrary monitor.
     """
-    monitors = _list_monitors()
-    if not monitors:
+    detailed = _list_monitors_detailed()
+    if not detailed:
         return None
+
+    if preference == "pointer":
+        return _resolve_monitor_by_signal(window_id, [m[2:] for m in detailed])
+
+    if preference != "primary":
+        for m in detailed:
+            if m.name == preference:
+                return m[2:]
+        log.warning("overlay.monitor=%r matches no output; using primary", preference)
+
+    for m in detailed:
+        if m.primary:
+            return m[2:]
+    return detailed[0][2:]
+
+
+def _resolve_monitor_by_signal(
+    window_id: int | None, monitors: list[tuple[int, int, int, int]]
+) -> tuple[int, int, int, int] | None:
     if window_id is not None:
         rect = _window_rect(window_id)
         if rect is not None:
@@ -128,6 +184,7 @@ class OverlayConfig:
     max_height_fraction: float = 0.33
     opacity: float = 0.85
     font: str = "monospace 18"
+    monitor: str = "primary"
 
 
 class Overlay:
@@ -185,7 +242,7 @@ class Overlay:
             return
         # Resolve target monitor BEFORE marshalling to the Tk thread (xrandr +
         # xdotool calls block; cheaper to do off the UI thread).
-        self._monitor = _resolve_monitor(target_window)
+        self._monitor = _resolve_monitor(target_window, preference=self._cfg.monitor)
         self._root.after(0, self._show_impl)
 
     def hide(self) -> None:

@@ -886,7 +886,7 @@ Expected: a `mean WER` and `median final` line per model. The first connection t
 newly pulled model includes a one-time model load; if a model's first fixture looks
 anomalous, re-run that model alone.
 
-- [ ] **Step 5: Pick the winner and record the evidence**
+- [x] **Step 5: Pick the winner and record the evidence**
 
 Selection rule: the lowest mean WER whose **median final** stays under 1500 ms and which
 still produces multiple partials per fixture — sparse partials mean the live overlay
@@ -894,7 +894,7 @@ stops feeling live, which is blurt's main advantage over the OSW clones.
 
 Paste the bench table into the Progress Log along with the chosen model and the reasoning.
 
-- [ ] **Step 6: Apply the winner**
+- [x] **Step 6: Apply the winner**
 
 Set `[whisper] model` in `~/.config/blurt/config.toml` to the winner, then:
 
@@ -905,13 +905,13 @@ Dictate three real sentences containing technical terms and confirm the overlay 
 fills in while you speak. If partials feel noticeably sparser than before, revert the one
 config line and pick the runner-up.
 
-- [ ] **Step 7: Update docs with the measured result**
+- [x] **Step 7: Update docs with the measured result**
 
 Update `docs/config.example.toml`'s `model` line to the winner, and add a short "Model
 selection" section to the README naming the winner, its mean WER, its median final
 latency, and the date measured — so the next reader does not re-litigate it.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add docs/config.example.toml README.md
@@ -946,7 +946,7 @@ compositor-side alternatives are unavailable on GNOME 46.
 `_resolve_monitor` keeps returning a plain `(x, y, w, h)` tuple so `_show_impl` and the
 existing tests are untouched. Names and the primary flag are used only during choice.
 
-- [ ] **Step 1: Write the failing tests for detailed monitor parsing**
+- [x] **Step 1: Write the failing tests for detailed monitor parsing**
 
 Add to `tests/test_overlay_monitor.py`:
 
@@ -978,12 +978,12 @@ def test_list_monitors_stays_rect_only(monkeypatch):
 `mons[0][2:]` works because `MonitorInfo` puts `name` and `primary` first, so index 2
 onward is the rect. That field ordering is what makes the slice readable.
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `.venv/bin/python -m pytest tests/test_overlay_monitor.py -q`
 Expected: FAIL — `AttributeError: module 'blurt.overlay' has no attribute '_parse_listmonitors'`
 
-- [ ] **Step 3: Implement parsing**
+- [x] **Step 3: Implement parsing**
 
 In `src/blurt/overlay.py`, add `NamedTuple` to the typing imports and replace
 `_list_monitors` with:
@@ -1046,12 +1046,12 @@ def _list_monitors() -> list[tuple[int, int, int, int]]:
 Delete the old `_list_monitors` body and its inline `pat` regex — `_MONITOR_LINE`
 replaces it and additionally anchors on the index prefix, so stray lines cannot match.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `.venv/bin/python -m pytest tests/test_overlay_monitor.py -q`
 Expected: PASS, including the six pre-existing tests in that file.
 
-- [ ] **Step 5: Write the failing tests for preference-based resolution**
+- [x] **Step 5: Write the failing tests for preference-based resolution**
 
 Add to `tests/test_overlay_monitor.py`:
 
@@ -1102,12 +1102,12 @@ def test_resolve_monitor_primary_falls_back_to_first_when_none_marked(monkeypatc
 The first test is the regression test for the reported bug: a stale pointer reading on
 DP-9 must not drag the overlay off the primary monitor.
 
-- [ ] **Step 6: Run the tests to verify they fail**
+- [x] **Step 6: Run the tests to verify they fail**
 
 Run: `.venv/bin/python -m pytest tests/test_overlay_monitor.py -q`
 Expected: FAIL — `_resolve_monitor() got an unexpected keyword argument 'preference'`
 
-- [ ] **Step 7: Implement preference-based resolution**
+- [x] **Step 7: Implement preference-based resolution**
 
 Replace `_resolve_monitor` in `src/blurt/overlay.py` with:
 
@@ -1166,12 +1166,12 @@ The five pre-existing `_resolve_monitor` tests call it with no `preference` and 
 `test_resolve_monitor_none_when_no_monitors`, which should patch
 `_list_monitors_detailed` to return `[]`.
 
-- [ ] **Step 8: Run the full overlay monitor suite**
+- [x] **Step 8: Run the full overlay monitor suite**
 
 Run: `.venv/bin/python -m pytest tests/test_overlay_monitor.py -q`
 Expected: PASS, including the updated pre-existing five.
 
-- [ ] **Step 9: Write the failing config test**
+- [x] **Step 9: Write the failing config test**
 
 Add to `tests/test_config.py`:
 
@@ -1187,12 +1187,12 @@ def test_overlay_monitor_override(tmp_path):
     assert load(p).overlay.monitor == "DP-4"
 ```
 
-- [ ] **Step 10: Run it to verify it fails**
+- [x] **Step 10: Run it to verify it fails**
 
 Run: `.venv/bin/python -m pytest tests/test_config.py -q`
 Expected: FAIL — `AttributeError: 'OverlayConfig' object has no attribute 'monitor'`
 
-- [ ] **Step 11: Add the config key and wire it through**
+- [x] **Step 11: Add the config key and wire it through**
 
 In `src/blurt/config.py`, add to `OverlayConfig`:
 
@@ -1219,12 +1219,12 @@ In `src/blurt/daemon.py`, add to the `Overlay(OverlayConfig(...))` construction:
             monitor=self._cfg.overlay.monitor,
 ```
 
-- [ ] **Step 12: Run the full suite and linter**
+- [x] **Step 12: Run the full suite and linter**
 
 Run: `.venv/bin/python -m pytest -q && .venv/bin/python -m ruff check src tests`
 Expected: all tests pass, ruff clean.
 
-- [ ] **Step 13: Verify against the real display**
+- [x] **Step 13: Verify against the real display**
 
 Run: `.venv/bin/python -c "from blurt import overlay; print(overlay._list_monitors_detailed()); print(overlay._resolve_monitor(None))"`
 Expected: three `MonitorInfo` rows with `DP-4` flagged `primary=True`, and the resolved
@@ -1238,7 +1238,7 @@ systemctl --user restart blurt
 Then dictate three times, with the mouse parked on a different monitor each time. The
 overlay must appear on DP-4 all three times.
 
-- [ ] **Step 15: Commit**
+- [x] **Step 15: Commit**
 
 ```bash
 git add src/blurt/overlay.py src/blurt/config.py src/blurt/daemon.py \
@@ -1301,6 +1301,7 @@ Append one row per session, before clearing context.
 | Date | Task | Commit | Notes |
 |---|---|---|---|
 | 2026-07-25 | Plan authored | — | Baseline: `017c34e`, 62 tests green, working tree clean. Environment facts verified and recorded in the design doc. Discarded leftover debug logging in `overlay.py` from `017c34e`. |
+| 2026-07-25 | 6 — overlay monitor pinning | (this commit) | Done. 81 tests green, ruff clean. On the real display `preference="primary"` resolves DP-4 (x=2560) while `preference="pointer"` resolves DP-9 (x=5120) — a live demonstration of the stale-pointer bug and the fix. Rewrote `test_overlay_monitor.py` around `MonitorInfo`; note one pre-existing test (`falls_back_to_first_when_no_signal`) had been passing by accident because `MONS[0]` happened to equal DP-4's rect. Live config gained an explicit `[overlay] monitor = "primary"`. **Step 14 (dictate from 3 monitors) OUTSTANDING — needs the user.** |
 | 2026-07-25 | 4 — bench-stt (code only) | (this commit) | Bench + CLI written. Found and fixed a latent CLI bug: bench subcommands were registered with no flags, so `blurt bench-cleanup --models x` (and `bench-whisper --wav`) died at the outer parser — every bench main now takes `argv` and the outer parser forwards unrecognized args, with `add_help=False` so `--help` reaches the real parser. **Steps 1 and 6 OUTSTANDING — need the user to record `tests/fixtures/*.wav`.** Also confirmed llmbox's HF cache is the persistent named volume `whisperlive_whisperlive-cache` (Task 5 Step 1 done early). **Next: Task 6 (overlay pinning), which needs nobody.** |
 | 2026-07-25 | 3 — initial_prompt + hotwords | (this commit) | Code + config + daemon wiring done; 72 tests green, ruff clean. Live `~/.config/blurt/config.toml` gained an `[stt]` block and the daemon was restarted. **Step 11 (dictate-and-check, incl. the silence hallucination check) is still OUTSTANDING — needs the user at the keyboard.** Task 4 step 6 measures the same thing properly. **Next: Task 4 (bench-stt), which needs fixture recordings from the user first.** |
 | 2026-07-25 | 2 — WER helper | (this commit) | Done, no surprises. 68 tests green (62 -> 68), ruff clean. **Next: Task 3 (initial_prompt + hotwords).** |
