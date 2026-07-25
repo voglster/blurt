@@ -1284,6 +1284,33 @@ setup.
   `keystate != key_down` (`src/blurt/hotkey.py:96`), so this needs key_up plumbing plus a
   hold-vs-tap threshold. Fully independent of Phase 1.
 
+- **Fix `aclose(): asynchronous generator is already running` on session teardown
+  (found 2026-07-25 during the bench).** Every WhisperLive session ends with this
+  RuntimeError on stderr:
+
+  ```
+  an error occurred during closing of asynchronous generator
+    <async_generator object Connection.send_context ...>
+  RuntimeError: aclose(): asynchronous generator is already running
+  ```
+
+  Cause: `WhisperLiveServer.stream()`'s `finally` block cancels `send_task` while that task
+  is suspended inside `ws.send(...)`, i.e. inside websockets' `send_context` async generator.
+  Cancelling mid-yield leaves the generator un-closeable, and the event loop complains when it
+  is finalized. It fires on every production dictate-and-commit too, not just in the bench —
+  results are unaffected, which is exactly why it went unnoticed.
+
+  Likely fix: signal the sender to stop cooperatively (an `asyncio.Event` the `async for`
+  checks) and `await` it with a timeout, instead of `send_task.cancel()`. Verify by running
+  `blurt bench-stt --models base.en` and confirming clean stderr.
+
+- **Rework the bench's latency metric (found 2026-07-25).** `Result.final_ms` times from
+  stream start, so it includes the fixture's full real-time playback — a 10.88 s clip reporting
+  `final=12420ms` actually means a 1.54 s tail. Report `final_ms - audio_duration_ms` instead,
+  and add the age of the last partial at commit time, which is what blurt's UX actually depends
+  on: `Daemon._finalize` snapshots the overlay text and never waits for the official final.
+  Task 5's "median final under 1500 ms" selection rule is meaningless until this is fixed.
+
 - **Correction capture / hotword feedback loop (user request, 2026-07-25).** When blurt
   mis-transcribes a term there is currently no way to tell it so — you have to remember the
   term, open `~/.config/blurt/config.toml`, edit `[stt] hotwords` by hand, and restart the
