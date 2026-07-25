@@ -21,7 +21,6 @@ async def _wav_chunks(path: Path, chunk_ms: int = 100):
         assert w.getsampwidth() == 2, "WAV must be s16"
         assert w.getnchannels() == 1, "WAV must be mono"
         frames_per_chunk = int(16000 * chunk_ms / 1000)
-        bytes_per_chunk = frames_per_chunk * 2
         while True:
             data = w.readframes(frames_per_chunk)
             if not data:

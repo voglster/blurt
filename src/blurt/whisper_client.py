@@ -161,7 +161,6 @@ class WhisperLiveServer:
             loop = asyncio.get_running_loop()
             last_text_change_time = 0.0
             last_text = ""
-            last_segments: list[dict] = []
             audio_done_time: float | None = None
 
             try:
@@ -211,7 +210,6 @@ class WhisperLiveServer:
                     segments = msg.get("segments")
                     if segments is None:
                         continue
-                    last_segments = segments
                     text = " ".join(s.get("text", "").strip() for s in segments).strip()
                     if text and text != last_text:
                         last_text = text

@@ -1,7 +1,6 @@
 import textwrap
 from pathlib import Path
 
-import pytest
 
 from blurt.config import Config, load
 

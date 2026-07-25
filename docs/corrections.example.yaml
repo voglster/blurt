@@ -1,0 +1,18 @@
+# Copy to ~/.config/blurt/corrections.yaml.
+#
+# Deterministic regex backstop applied after transcription (and after the optional
+# cleanup pass). Prefer fixing terms at decode time with [stt] initial_prompt and
+# [stt] hotwords; keep only the rules those fail to handle.
+
+- pattern: '(?i)\bgit\s*hub\b'
+  replacement: 'GitHub'
+- pattern: '(?i)\bgit\s*lab\b'
+  replacement: 'GitLab'
+- pattern: '(?i)\bcube\s*cuttle\b'
+  replacement: 'kubectl'
+- pattern: '(?i)\bpost\s*gres\b'
+  replacement: 'Postgres'
+- pattern: '(?i)\bj\s*son\b'
+  replacement: 'JSON'
+- pattern: '(?i)\by\s*a\s*m\s*l\b'
+  replacement: 'YAML'

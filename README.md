@@ -1,6 +1,11 @@
 # blurt
 
-Fast personal Linux dictation. Audio is captured locally and streamed to a remote Wyoming faster-whisper instance (typically `llmbox` over Tailscale). On finalization, the transcript runs through a fast Ollama model for capitalization, punctuation, and tech-term fixes (GitHub, kubectl, JSON, etc.) with a strict 500ms budget — if cleanup is slow or unreachable, you keep the raw whisper output.
+Fast personal Linux dictation. Audio is captured locally and streamed to a remote
+speech-to-text server on `llmbox` over Tailscale, with live partial transcripts shown in
+an overlay as you talk. Two backends are supported: **WhisperLive** (WebSocket, streaming
+partials — the default) and **Wyoming faster-whisper** (batch). An optional Ollama cleanup
+pass can fix capitalization and punctuation under a strict latency budget; it is off by
+default because `initial_prompt` + `hotwords` handle vocabulary at decode time instead.
 
 ## How it works
 
@@ -23,29 +28,56 @@ Right-click the tray icon for "Copy last transcript" (retrieves the last commit 
   standalone Python bundles a Tk built *without* Xft, which renders the overlay
   in a non-anti-aliased bitmap font. Install on the system interpreter (see below).
 - User in the `input` group, and read/write access to `/dev/uinput` (logind grants this to the active seat; needed for the Wayland typer)
-- Remote `llmbox` running:
-    - Wyoming faster-whisper on TCP 10300
-    - Ollama on HTTP 11434
+- Remote `llmbox` running one of:
+    - **WhisperLive** on TCP 9091 (default; `[whisper] backend = "whisperlive"`)
+    - Wyoming faster-whisper on TCP 10300 (`backend = "wyoming"`)
+- Optionally, Ollama on HTTP 11434 for the cleanup pass (`[cleanup] enabled = true`)
 
 ## Install
 
     # Install on the system interpreter so the overlay gets an Xft (anti-aliased) Tk.
     uv tool install --python /usr/bin/python3 --editable .
     mkdir -p ~/.config/blurt
-    # Copy example config + corrections (see docs/superpowers/specs/...)
+    cp docs/config.example.toml ~/.config/blurt/config.toml
+    cp docs/corrections.example.yaml ~/.config/blurt/corrections.yaml
     cp systemd/blurt.service ~/.config/systemd/user/
     systemctl --user daemon-reload
     systemctl --user enable --now blurt.service
 
 ## Benchmark + tune
 
-    blurt bench-cleanup           # pick fastest acceptable model
-    # Edit ~/.config/blurt/config.toml [cleanup] model = "..."
+    blurt bench-stt               # compare STT models on latency + word error rate
+    blurt bench-cleanup           # pick fastest acceptable cleanup model
+    # Edit ~/.config/blurt/config.toml, then:
     systemctl --user restart blurt
+
+`bench-stt` reads `<name>.wav` + `<name>.txt` fixture pairs from `tests/fixtures/` — real
+recordings of your own voice, not synthesized speech, since TTS audio is too clean to
+separate the candidates.
+
+## Configuration notes
+
+- `[whisper] use_vad` has **no effect**. WhisperLive takes VAD as a server launch flag
+  (`use_vad=self.use_vad` in its `handle_new_connection`) and ignores whatever the client
+  sends in its config payload. To change VAD behavior, change how the WhisperLive
+  container is started on `llmbox`.
+- `[whisper] model` accepts either a Whisper size name (`base.en`, `small.en`) or a
+  HuggingFace CTranslate2 repo id. Any model must already be present in the WhisperLive
+  container's HuggingFace cache — otherwise the first connection stalls on a multi-GB
+  download while you are mid-sentence.
+- `[stt] initial_prompt` and `[stt] hotwords` bias decoding toward your vocabulary at no
+  latency cost, and are the preferred fix for mis-transcribed technical terms.
+  `corrections.yaml` remains as a deterministic backstop.
+- `[overlay] monitor` selects where the overlay appears: `"primary"` (default), an output
+  name like `"DP-4"`, or `"pointer"`. Prefer an explicit choice on Wayland — pointer
+  resolution needs `xdotool getmouselocation`, which under XWayland only sees the pointer
+  while it is over an X11 surface and otherwise returns a stale position.
 
 ## Design
 
-See `docs/superpowers/specs/2026-05-23-blurt-design.md`.
+- Original design: `docs/superpowers/specs/2026-05-23-blurt-design.md`
+- Overlay UX: `docs/superpowers/specs/2026-05-23-blurt-v2-overlay-ux-design.md`
+- Accuracy + placement: `docs/superpowers/specs/2026-07-25-blurt-accuracy-and-placement-design.md`
 
 ## License
 

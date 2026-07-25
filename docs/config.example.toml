@@ -1,0 +1,33 @@
+# Copy to ~/.config/blurt/config.toml and edit.
+
+[whisper]
+backend = "whisperlive"   # "whisperlive" (streaming) or "wyoming" (batch)
+host = "llmbox"
+port = 9091
+model = "base.en"         # size name or HF CTranslate2 repo id
+use_vad = false           # NO-OP: WhisperLive takes VAD as a server launch flag
+
+[stt]
+# Biases decoding toward this vocabulary. Costs no extra latency.
+initial_prompt = ""
+hotwords = ""
+
+[cleanup]
+enabled = false           # optional Ollama post-pass
+host = "llmbox"
+port = 11434
+model = "llama3.2:latest"
+timeout_ms = 500
+
+[hotkey]
+keycode = "KEY_CALC"
+device = "auto"
+
+[corrections]
+file = "~/.config/blurt/corrections.yaml"
+
+[overlay]
+monitor = "primary"       # "primary", an output name like "DP-4", or "pointer"
+
+[tray]
+enabled = true
