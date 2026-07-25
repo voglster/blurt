@@ -859,7 +859,11 @@ WhisperLive's own defaults apply. **No WhisperLive or faster-whisper upgrade is 
 0.8.0 / 1.2.0 already support `initial_prompt`, `hotwords`, and large-v3-turbo. The only
 llmbox-side change required is pulling model files (Step 2).
 
-- [ ] **Step 2: Pre-pull the candidate models**
+- [x] **Step 2: Pre-pull the candidate models** — DONE 2026-07-25
+
+Both pulled successfully into the persistent volume; the HF cache went 605 MB -> 3.6 GB and
+now holds `base.en`, `small.en`, `distil-large-v3.5-ct2`, and
+`faster-whisper-large-v3-turbo-ct2`. Command used, for reference:
 
 ```bash
 ssh llmbox 'docker exec whisperlive python -c "
@@ -872,12 +876,28 @@ for repo in (\"distil-whisper/distil-large-v3.5-ct2\",
 Expected: both paths printed. A failure here means the repo id moved — search HuggingFace
 for the current CTranslate2 conversion rather than guessing at a name.
 
-- [ ] **Step 3: Verify VRAM headroom**
+- [x] **Step 3: Verify VRAM headroom** — DONE 2026-07-25, WITH A CAVEAT
 
-Run: `ssh llmbox 'docker exec whisperlive nvidia-smi --query-gpu=memory.used,memory.total --format=csv'`
-Expected: room for a ~1.6 GB model on top of current usage, out of 10240 MiB. Note the
-baseline — if something else on llmbox is holding most of the card, run the bench when it
-is idle, or the latency numbers are meaningless.
+Measured 5381 / 10240 MiB used, so **only ~4.8 GB free**. The consumer is not whisperlive
+(224 MiB) — it is `mimic-server` in the `mimic-tts` container, holding **4320 MiB**. Others:
+`wyoming-faster-whisper` 440 MiB, coqui `tts` 372 MiB. Ollama is running but has no model
+resident (`/api/ps` -> empty).
+
+**Therefore: do NOT run Step 4 with the default four-model list in one go.** WhisperLive
+instantiates a model per client connection unless started with `--single_model`, and the
+compose file passes no flags, so a 4-model x 4-fixture sweep can stack model instances and
+OOM the card. Run one model at a time and check VRAM between runs:
+
+```bash
+for m in base.en small.en distil-whisper/distil-large-v3.5-ct2 \
+         deepdml/faster-whisper-large-v3-turbo-ct2; do
+  .venv/bin/python -m blurt bench-stt --models "$m" 2>&1 | tee -a /tmp/bench-stt.txt
+  ssh llmbox 'docker exec whisperlive nvidia-smi --query-gpu=memory.used --format=csv,noheader'
+done
+```
+
+If a run OOMs, `docker restart whisperlive` to reclaim, and consider stopping `mimic-tts`
+for the duration of the bench to free its 4.3 GB.
 
 - [ ] **Step 4: Run the bench across all four candidates**
 
@@ -1301,6 +1321,7 @@ Append one row per session, before clearing context.
 | Date | Task | Commit | Notes |
 |---|---|---|---|
 | 2026-07-25 | Plan authored | — | Baseline: `017c34e`, 62 tests green, working tree clean. Environment facts verified and recorded in the design doc. Discarded leftover debug logging in `overlay.py` from `017c34e`. |
+| 2026-07-25 | 5 — model choice (steps 1-3) | (this commit) | llmbox prep done, no reboot needed for it. **No WhisperLive/faster-whisper upgrade required** — 0.8.0 / 1.2.0 already support everything. Both candidate models pulled (cache 605 MB -> 3.6 GB, persistent volume). **Caveat found: only ~4.8 GB VRAM free** — `mimic-server` in `mimic-tts` holds 4320 MiB of the 10240 MiB card, whisperlive only 224 MiB. Step 4 must run one model at a time; details in the step. Separately, llmbox's host `nvidia-smi` is broken (loaded module 580.159.03 vs built/userspace 580.173.02 — driver upgraded without a module reload); containers unaffected, fix is a reboot, walked the user through it. **Steps 4-8 OUTSTANDING — need fixtures from Task 4 Step 1 first.** |
 | 2026-07-25 | 6 — overlay monitor pinning | (this commit) | Done. 81 tests green, ruff clean. On the real display `preference="primary"` resolves DP-4 (x=2560) while `preference="pointer"` resolves DP-9 (x=5120) — a live demonstration of the stale-pointer bug and the fix. Rewrote `test_overlay_monitor.py` around `MonitorInfo`; note one pre-existing test (`falls_back_to_first_when_no_signal`) had been passing by accident because `MONS[0]` happened to equal DP-4's rect. Live config gained an explicit `[overlay] monitor = "primary"`. **Step 14 (dictate from 3 monitors) OUTSTANDING — needs the user.** |
 | 2026-07-25 | 4 — bench-stt (code only) | (this commit) | Bench + CLI written. Found and fixed a latent CLI bug: bench subcommands were registered with no flags, so `blurt bench-cleanup --models x` (and `bench-whisper --wav`) died at the outer parser — every bench main now takes `argv` and the outer parser forwards unrecognized args, with `add_help=False` so `--help` reaches the real parser. **Steps 1 and 6 OUTSTANDING — need the user to record `tests/fixtures/*.wav`.** Also confirmed llmbox's HF cache is the persistent named volume `whisperlive_whisperlive-cache` (Task 5 Step 1 done early). **Next: Task 6 (overlay pinning), which needs nobody.** |
 | 2026-07-25 | 3 — initial_prompt + hotwords | (this commit) | Code + config + daemon wiring done; 72 tests green, ruff clean. Live `~/.config/blurt/config.toml` gained an `[stt]` block and the daemon was restarted. **Step 11 (dictate-and-check, incl. the silence hallucination check) is still OUTSTANDING — needs the user at the keyboard.** Task 4 step 6 measures the same thing properly. **Next: Task 4 (bench-stt), which needs fixture recordings from the user first.** |
