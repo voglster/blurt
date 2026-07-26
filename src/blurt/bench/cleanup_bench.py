@@ -13,6 +13,7 @@ import statistics
 import time
 
 from blurt.cleanup_client import CleanupClient
+from blurt.config import load
 
 SAMPLES = [
     "open git hub dot com",
@@ -23,11 +24,14 @@ SAMPLES = [
 ]
 
 
-async def _bench_model(host: str, port: int, model: str, timeout_ms: int) -> None:
+async def _bench_model(
+    host: str, port: int, model: str, timeout_ms: int, vocabulary: str
+) -> None:
     client = CleanupClient(
         base_url=f"http://{host}:{port}",
         model=model,
         timeout_ms=timeout_ms,
+        vocabulary=vocabulary,
     )
     try:
         await client.cleanup(SAMPLES[0])  # warm-up
@@ -47,10 +51,12 @@ async def _bench_model(host: str, port: int, model: str, timeout_ms: int) -> Non
         await client.aclose()
 
 
-async def _run(host: str, port: int, models: list[str], timeout_ms: int) -> None:
+async def _run(
+    host: str, port: int, models: list[str], timeout_ms: int, vocabulary: str
+) -> None:
     for model in models:
         print(f"=== {model} ===")
-        await _bench_model(host, port, model, timeout_ms)
+        await _bench_model(host, port, model, timeout_ms, vocabulary)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -63,6 +69,11 @@ def main(argv: list[str] | None = None) -> int:
         default=["qwen2.5:1.5b", "llama3.2:1b", "phi3:mini"],
     )
     parser.add_argument("--timeout-ms", type=int, default=5000)
+    parser.add_argument(
+        "--vocabulary", default=None,
+        help="override [stt] hotwords from your config",
+    )
     args = parser.parse_args(argv)
-    asyncio.run(_run(args.host, args.port, args.models, args.timeout_ms))
+    vocabulary = args.vocabulary if args.vocabulary is not None else load().stt.hotwords
+    asyncio.run(_run(args.host, args.port, args.models, args.timeout_ms, vocabulary))
     return 0

@@ -64,6 +64,7 @@ class Daemon:
             base_url=f"http://{self._cfg.cleanup.host}:{self._cfg.cleanup.port}",
             model=self._cfg.cleanup.model,
             timeout_ms=self._cfg.cleanup.timeout_ms,
+            vocabulary=self._cfg.stt.hotwords,
         )
         if self._cfg.whisper.backend == "whisperlive":
             self._whisper_server = WhisperLiveServer(

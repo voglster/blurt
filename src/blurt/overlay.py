@@ -21,6 +21,25 @@ class MonitorInfo(NamedTuple):
     h: int
 
 
+# The X11 last-resort bitmap. Tk only lands here when it could not resolve the
+# requested family at all — generic aliases like "monospace" need fontconfig,
+# which a Tk built without Xft does not have.
+_LAST_RESORT_FAMILY = "fixed"
+
+
+def unresolved_font_warning(requested: str, resolved_family: str) -> str | None:
+    if resolved_family.strip().casefold() != _LAST_RESORT_FAMILY:
+        return None
+    return (
+        f"overlay font {requested!r} did not resolve — Tk fell back to the "
+        f"{_LAST_RESORT_FAMILY!r} bitmap font, so the overlay will look blocky and "
+        "un-anti-aliased. This Python's Tk was built without Xft. Reinstall against "
+        "the system interpreter, which has an Xft-enabled Tk: "
+        "`sudo apt install python3-tk` then "
+        "`uv tool install --force --python /usr/bin/python3 --editable .`"
+    )
+
+
 _MONITOR_LINE = re.compile(
     r"^\s*\d+:\s+\+(?P<primary>\*?)(?P<name>\S+)\s+"
     r"(?P<w>\d+)/\d+x(?P<h>\d+)/\d+\+(?P<x>-?\d+)\+(?P<y>-?\d+)"
@@ -262,6 +281,15 @@ class Overlay:
 
     # --- Tk-thread internals ---
 
+    def _warn_if_font_unresolved(self) -> None:
+        try:
+            resolved = self._root.tk.call("font", "actual", self._cfg.font, "-family")
+        except tk.TclError:
+            return
+        warning = unresolved_font_warning(self._cfg.font, str(resolved))
+        if warning:
+            log.warning("%s", warning)
+
     def _run(self) -> None:
         self._root = tk.Tk()
         self._root.withdraw()
@@ -287,6 +315,7 @@ class Overlay:
         )
         self._text_widget.pack(fill="both", expand=True)
         self._text_widget.configure(state="disabled")
+        self._warn_if_font_unresolved()
 
         self._ready.set()
         try:

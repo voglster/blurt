@@ -19,10 +19,32 @@ import wave
 from dataclasses import dataclass
 from pathlib import Path
 
+from blurt.config import Config, load
 from blurt.wer import wer as word_error_rate
 from blurt.whisper_client import WhisperLiveServer, WhisperSession
 
 FIXTURES = Path(__file__).resolve().parents[3] / "tests" / "fixtures"
+
+
+def resolve_prompting(
+    initial_prompt: str | None,
+    hotwords: str | None,
+    no_prompt: bool,
+    config: Config | None = None,
+) -> tuple[str | None, str | None]:
+    """Decide what prompting to benchmark with.
+
+    Defaulting to the user's `[stt]` config means the benchmark measures the
+    setup they actually dictate under. Passing either flag suppresses config for
+    both, so a run never silently mixes a flag with a config value the user did
+    not pair it with; `--no-prompt` forces the bare baseline.
+    """
+    if no_prompt:
+        return None, None
+    if initial_prompt is not None or hotwords is not None:
+        return initial_prompt, hotwords
+    cfg = config if config is not None else load()
+    return cfg.stt.initial_prompt or None, cfg.stt.hotwords or None
 
 
 @dataclass
@@ -127,11 +149,25 @@ def main(argv: list[str] | None = None) -> int:
         ],
     )
     parser.add_argument("--fixtures", type=Path, default=FIXTURES)
-    parser.add_argument("--initial-prompt", default=None)
-    parser.add_argument("--hotwords", default=None)
+    parser.add_argument(
+        "--initial-prompt", default=None,
+        help="override [stt] initial_prompt from your config",
+    )
+    parser.add_argument(
+        "--hotwords", default=None,
+        help="override [stt] hotwords from your config",
+    )
+    parser.add_argument(
+        "--no-prompt", action="store_true",
+        help="benchmark with no prompting at all, ignoring your config",
+    )
     args = parser.parse_args(argv)
+    initial_prompt, hotwords = resolve_prompting(
+        args.initial_prompt, args.hotwords, args.no_prompt
+    )
+    print(f"initial_prompt: {initial_prompt!r}\nhotwords:       {hotwords!r}")
     asyncio.run(_run(
         args.host, args.port, args.models, args.fixtures,
-        args.initial_prompt, args.hotwords,
+        initial_prompt, hotwords,
     ))
     return 0

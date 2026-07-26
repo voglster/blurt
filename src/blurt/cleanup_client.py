@@ -7,14 +7,26 @@ import httpx
 log = logging.getLogger(__name__)
 
 
-SYSTEM_PROMPT = (
-    "You are a transcription post-processor. Fix capitalization, punctuation, "
-    "and the spelling of well-known technical terms (e.g., GitHub, GitLab, "
-    "kubectl, Postgres, PostgreSQL, npm, JSON, YAML, AWS, Docker, Kubernetes, "
-    "Python, JavaScript, TypeScript). Do NOT paraphrase, summarize, expand, "
-    "or change wording. Do NOT add or remove content. Return ONLY the "
-    "corrected text with no quotes, no commentary, no explanation."
+FALLBACK_VOCABULARY = (
+    "GitHub, GitLab, kubectl, Postgres, PostgreSQL, npm, JSON, YAML, AWS, "
+    "Docker, Kubernetes, Python, JavaScript, TypeScript"
 )
+
+
+def build_system_prompt(vocabulary: str = "") -> str:
+    """Build the cleanup prompt, spelling out the user's own vocabulary.
+
+    `vocabulary` takes the comma-separated form of `[stt] hotwords`, so one
+    config value drives both decode-time biasing and the cleanup pass.
+    """
+    terms = ", ".join(t.strip() for t in vocabulary.split(",") if t.strip())
+    return (
+        "You are a transcription post-processor. Fix capitalization, punctuation, "
+        f"and the spelling of well-known technical terms (e.g., {terms or FALLBACK_VOCABULARY}). "
+        "Do NOT paraphrase, summarize, expand, "
+        "or change wording. Do NOT add or remove content. Return ONLY the "
+        "corrected text with no quotes, no commentary, no explanation."
+    )
 
 
 class CleanupClient:
@@ -23,11 +35,13 @@ class CleanupClient:
         base_url: str,
         model: str,
         timeout_ms: int,
+        vocabulary: str = "",
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._model = model
         self._timeout_s = timeout_ms / 1000
+        self._system_prompt = build_system_prompt(vocabulary)
         self._client = httpx.AsyncClient(transport=transport, timeout=self._timeout_s)
 
     async def cleanup(self, text: str) -> str:
@@ -38,7 +52,7 @@ class CleanupClient:
                 f"{self._base_url}/api/generate",
                 json={
                     "model": self._model,
-                    "system": SYSTEM_PROMPT,
+                    "system": self._system_prompt,
                     "prompt": text,
                     "stream": False,
                     "options": {"temperature": 0},

@@ -24,10 +24,8 @@ Right-click the tray icon for "Copy last transcript" (retrieves the last commit 
     - **X11:** types via `xdotool`; clipboard via `xclip` (`sudo apt install xclip`)
     - **Wayland:** types via a `/dev/uinput` virtual keyboard (compositor-agnostic, works on GNOME/Mutter); clipboard via `wl-copy` (`sudo apt install wl-clipboard`)
 - `pw-cat` (PipeWire utils)
-- Python 3.12+ with an **Xft-enabled Tk** for the overlay font. The system
-  `python3` + `python3-tk` (`sudo apt install python3-tk`) qualifies; uv's
-  standalone Python bundles a Tk built *without* Xft, which renders the overlay
-  in a non-anti-aliased bitmap font. Install on the system interpreter (see below).
+- Python 3.12+ with an **Xft-enabled Tk** for the overlay font — install against the
+  system interpreter, not uv's. See [Known issues](#known-issues).
 - User in the `input` group, and read/write access to `/dev/uinput` (logind grants this to the active seat; needed for the Wayland typer)
 - A reachable STT host running one of:
     - **WhisperLive** on TCP 9091 (default; `[whisper] backend = "whisperlive"`)
@@ -54,7 +52,11 @@ Right-click the tray icon for "Copy last transcript" (retrieves the last commit 
 
 `bench-stt` reads `<name>.wav` + `<name>.txt` fixture pairs from `tests/fixtures/` — real
 recordings of your own voice, not synthesized speech, since TTS audio is too clean to
-separate the candidates.
+separate the candidates. Record your own with `scripts/record-fixtures.sh`.
+
+Both benchmarks default to the `[stt]` prompting in your own config, so they measure the
+setup you actually dictate under. Override with `--initial-prompt` / `--hotwords`, or pass
+`--no-prompt` for a bare baseline.
 
 ## Model selection
 
@@ -131,6 +133,23 @@ prompt are fine). Avoid `distil-large-v3.5` too: distil models largely ignore
   name like `"DP-4"`, or `"pointer"`. Prefer an explicit choice on Wayland — pointer
   resolution needs `xdotool getmouselocation`, which under XWayland only sees the pointer
   while it is over an X11 surface and otherwise returns a stale position.
+
+## Known issues
+
+**The overlay font renders as a blocky bitmap.** The overlay needs a Tk built with Xft.
+uv's standalone Python bundles a Tk built *without* it, so `monospace` never resolves and
+Tk falls back to the X11 `fixed` bitmap. blurt detects this at startup and logs a warning
+naming the fix (`journalctl --user -u blurt`). To fix it, install against the system
+interpreter, which has an Xft-enabled Tk:
+
+    sudo apt install python3-tk
+    uv tool install --force --python /usr/bin/python3 --editable .
+
+This is why the install instructions pass `--python /usr/bin/python3`. Everything else
+works fine under uv's Python; the overlay font is the only casualty.
+
+**`[whisper] use_vad` and `[whisper] model` may be ignored** — both are server-side
+launch concerns for WhisperLive. See [Configuration notes](#configuration-notes).
 
 ## License
 
