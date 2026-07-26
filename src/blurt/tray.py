@@ -5,7 +5,6 @@ import threading
 from collections.abc import Callable
 from enum import Enum
 
-import pystray
 from PIL import Image, ImageDraw
 
 log = logging.getLogger(__name__)
@@ -15,6 +14,13 @@ class TrayState(Enum):
     IDLE = "idle"
     RECORDING = "recording"
     PROCESSING = "processing"
+
+
+def _title(state: TrayState, paused: bool) -> str:
+    # pystray's X11 backend sets the title via an Xlib string property, which it
+    # encodes as latin-1 — a non-latin-1 character here raises instead of just
+    # rendering oddly. Keep this ASCII.
+    return f"blurt ({state.value}){' (paused)' if paused else ''}"
 
 
 def _make_icon(state: TrayState) -> Image.Image:
@@ -41,6 +47,11 @@ class Tray:
         self._on_toggle_pause = on_toggle_pause
         self._state = TrayState.IDLE
         self._paused = False
+        # Imported here, not at module scope: pystray opens the X display as an
+        # import side effect, which would make `import blurt.daemon` fail on a
+        # headless machine even when the tray is disabled.
+        import pystray
+
         self._icon = pystray.Icon(
             "blurt",
             icon=_make_icon(TrayState.IDLE),
@@ -74,8 +85,7 @@ class Tray:
         self._icon.stop()
 
     def _refresh_title(self) -> None:
-        suffix = " — paused" if self._paused else ""
-        self._icon.title = f"blurt ({self._state.value}){suffix}"
+        self._icon.title = _title(self._state, self._paused)
 
     def _handle_copy_last(self) -> None:
         if self._on_copy_last is not None:
