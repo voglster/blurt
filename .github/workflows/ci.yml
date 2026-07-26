@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      # The overlay needs Tk to import, even though its lifecycle test skips
+      # without a display. Runners are headless: the suite is expected to skip
+      # the display-dependent tests, not error on them.
+      - run: uv sync --all-extras --dev --python ${{ matrix.python-version }}
+
+      - run: uv run --python ${{ matrix.python-version }} ruff check .
+
+      - run: uv run --python ${{ matrix.python-version }} pytest -q
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv build

@@ -25,6 +25,11 @@ dependencies = [
     "pyyaml>=6.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/voglster/blurt"
+Repository = "https://github.com/voglster/blurt"
+Issues = "https://github.com/voglster/blurt/issues"
+
 [project.scripts]
 blurt = "blurt.cli:main"
 
