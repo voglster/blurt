@@ -49,13 +49,14 @@ class TrayConfig:
 @dataclass(frozen=True)
 class OverlayConfig:
     enabled: bool = True
-    position: str = "top-center"
-    width_fraction: float = 0.6
-    min_height_px: int = 150
+    position: str = "center"
+    width_fraction: float = 0.75
+    min_height_px: int = 200
     max_height_fraction: float = 0.33
     opacity: float = 0.85
     font: str = "monospace 22"
     monitor: str = "primary"   # "primary", an output name (e.g. "DP-4"), or "pointer"
+    corner_radius: int = 14    # 0 for square corners
 
 
 @dataclass(frozen=True)

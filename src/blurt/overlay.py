@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import gc
 import logging
+import math
 import re
 import subprocess
 import threading
@@ -199,17 +200,41 @@ def _resolve_monitor_by_signal(
 @dataclass
 class OverlayConfig:
     enabled: bool = True
-    position: str = "top-center"
-    width_fraction: float = 0.6
-    min_height_px: int = 150
+    position: str = "center"
+    width_fraction: float = 0.75
+    min_height_px: int = 200
     max_height_fraction: float = 0.33
     opacity: float = 0.85
     font: str = "monospace 22"
     monitor: str = "primary"
+    corner_radius: int = 14
 
 
 _EDGE_MARGIN_PX = 80
-_DEFAULT_POSITION = "top-center"
+_DEFAULT_POSITION = "center"
+_POSITIONS = ("center", "top-center", "bottom-center")
+
+
+def _rounded_rect_scanlines(w: int, h: int, radius: int) -> list[tuple[int, int, int, int]]:
+    """Approximate a rounded rectangle as (x, y, width, height) rects.
+
+    X11's SHAPE extension takes a region, not a path, so the curve is built one
+    scanline per row of each corner. The mask is 1-bit, so corners come out
+    hard-edged — there is no anti-aliasing to be had here.
+    """
+    radius = min(radius, w // 2, h // 2)
+    if radius <= 0:
+        return [(0, 0, w, h)]
+
+    rects = [(0, radius, w, h - 2 * radius)]
+    for dy in range(radius):
+        # Distance from the corner circle's centre to this scanline's midpoint.
+        offset = radius - dy - 0.5
+        inset = radius - int(math.sqrt(max(radius * radius - offset * offset, 0.0)))
+        width = w - 2 * inset
+        rects.append((inset, dy, width, 1))
+        rects.append((inset, h - 1 - dy, width, 1))
+    return rects
 
 
 def _overlay_geometry(
@@ -217,26 +242,28 @@ def _overlay_geometry(
 ) -> tuple[int, int, int, int]:
     """Return (w, h, x, y) for the overlay on `monitor`.
 
-    Both positions sit one margin in from their edge, so they are mirror images.
-    Which edge is anchored decides how the box grows as the transcript gets
-    longer: top-center grows downward and its y never moves, bottom-center grows
-    upward and its y rises with the height.
+    top-center and bottom-center sit one margin in from their respective edges,
+    mirroring each other. The anchored edge decides how the box grows as the
+    transcript lengthens: top-center grows downward with a fixed y, bottom-center
+    grows upward, and center grows both ways at half the rate.
     """
     mx, my, mw, mh = monitor
     w = int(mw * cfg.width_fraction)
     x = mx + (mw - w) // 2
 
     position = cfg.position
-    if position not in ("top-center", "bottom-center"):
+    if position not in _POSITIONS:
         log.warning(
-            "overlay.position=%r is not a known position; using %s",
-            position, _DEFAULT_POSITION,
+            "overlay.position=%r is not one of %s; using %s",
+            position, ", ".join(_POSITIONS), _DEFAULT_POSITION,
         )
         position = _DEFAULT_POSITION
 
+    if position == "top-center":
+        return w, height, x, my + _EDGE_MARGIN_PX
     if position == "bottom-center":
         return w, height, x, my + mh - height - _EDGE_MARGIN_PX
-    return w, height, x, my + _EDGE_MARGIN_PX
+    return w, height, x, my + (mh - height) // 2
 
 
 class Overlay:
@@ -255,6 +282,8 @@ class Overlay:
         self._pending_text: str | None = None
         self._visible: bool = False
         self._monitor: tuple[int, int, int, int] | None = None
+        self._xdisplay = None
+        self._shaping_unavailable = False
 
     # --- lifecycle ---
 
@@ -316,6 +345,38 @@ class Overlay:
 
     # --- Tk-thread internals ---
 
+    def _apply_corner_shape(self, w: int, h: int) -> None:
+        """Clip the window to a rounded rectangle via the X11 SHAPE extension.
+
+        Tk cannot round a window itself. The shape is in window coordinates, so it
+        has to be reapplied after every geometry change. Purely decorative: any
+        failure here degrades to square corners rather than costing a dictation.
+        """
+        if self._cfg.corner_radius <= 0 or self._shaping_unavailable:
+            return
+        try:
+            from Xlib import display as xdisplay
+            from Xlib.ext import shape
+
+            if self._xdisplay is None:
+                self._xdisplay = xdisplay.Display()
+            window = self._xdisplay.create_resource_object(
+                "window", self._root.winfo_id()
+            )
+            window.shape_rectangles(
+                shape.SO.Set, shape.SK.Bounding, 0, 0, 0,
+                [
+                    {"x": x, "y": y, "width": rw, "height": rh}
+                    for x, y, rw, rh in _rounded_rect_scanlines(
+                        w, h, self._cfg.corner_radius
+                    )
+                ],
+            )
+            self._xdisplay.sync()
+        except Exception as exc:
+            self._shaping_unavailable = True
+            log.warning("rounded corners unavailable (%s); using square corners", exc)
+
     def _warn_if_font_unresolved(self) -> None:
         import tkinter as tk
 
@@ -375,6 +436,12 @@ class Overlay:
             # interpreter — without the explicit collect it survives until
             # process-shutdown GC on the main thread, which aborts with
             # "Tcl_AsyncDelete: async handler deleted by the wrong thread".
+            if self._xdisplay is not None:
+                try:
+                    self._xdisplay.close()
+                except Exception:
+                    pass
+                self._xdisplay = None
             self._text_widget = None
             self._root = None
             gc.collect()
@@ -390,6 +457,8 @@ class Overlay:
             (mx, my, mw, mh), self._cfg, self._cfg.min_height_px
         )
         self._root.geometry(f"{w}x{h}+{x}+{y}")
+        self._root.update_idletasks()
+        self._apply_corner_shape(w, h)
         self._root.deiconify()
         self._root.lift()
         self._visible = True
@@ -438,3 +507,5 @@ class Overlay:
         new_h = min(max(desired, self._cfg.min_height_px), max_h)
         w, h, x, y = _overlay_geometry((mx, my, mw, mh), self._cfg, new_h)
         self._root.geometry(f"{w}x{h}+{x}+{y}")
+        self._root.update_idletasks()
+        self._apply_corner_shape(w, h)

@@ -93,6 +93,7 @@ class Daemon:
             opacity=self._cfg.overlay.opacity,
             font=self._cfg.overlay.font,
             monitor=self._cfg.overlay.monitor,
+            corner_radius=self._cfg.overlay.corner_radius,
         ))
         self._tray = (
             Tray(
