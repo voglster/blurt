@@ -12,6 +12,12 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.12", "3.13"]
+    env:
+      # blurt.overlay imports tkinter at module scope, and Ubuntu's system
+      # python3.12 ships without it (it lives in the python3-tk package). uv's
+      # managed builds bundle tkinter, so use those rather than whatever
+      # interpreter the runner happens to have installed.
+      UV_PYTHON_PREFERENCE: only-managed
     steps:
       - uses: actions/checkout@v4
 
