@@ -1,5 +1,7 @@
 [project]
-name = "blurt"
+# PyPI's "blurt" is taken by an unrelated macOS transcription tool. The import
+# package and the `blurt` command are unaffected; only the published name differs.
+name = "blurt-stt"
 version = "0.1.0"
 description = "Linux dictation daemon using a remote WhisperLive / Wyoming faster-whisper server, with optional Ollama cleanup."
 readme = "README.md"

@@ -13,21 +13,18 @@ jobs:
       matrix:
         python-version: ["3.12", "3.13"]
     env:
-      # blurt.overlay imports tkinter at module scope, and Ubuntu's system
-      # python3.12 ships without it (it lives in the python3-tk package). uv's
-      # managed builds bundle tkinter, so use those rather than whatever
-      # interpreter the runner happens to have installed.
+      # Ubuntu's system python3.12 has no tkinter (it lives in python3-tk).
+      # Importing blurt no longer needs Tk, so this is not about avoiding a
+      # crash — it is so the Tk-dependent tests actually run here instead of
+      # silently skipping. uv's managed builds bundle tkinter.
       UV_PYTHON_PREFERENCE: only-managed
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v9.0.0
         with:
           enable-cache: true
 
-      # The overlay needs Tk to import, even though its lifecycle test skips
-      # without a display. Runners are headless: the suite is expected to skip
-      # the display-dependent tests, not error on them.
       - run: uv sync --all-extras --dev --python ${{ matrix.python-version }}
 
       - run: uv run --python ${{ matrix.python-version }} ruff check .
@@ -37,6 +34,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v9.0.0
       - run: uv build

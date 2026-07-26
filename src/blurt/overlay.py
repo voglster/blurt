@@ -5,9 +5,11 @@ import logging
 import re
 import subprocess
 import threading
-import tkinter as tk
 from dataclasses import dataclass
-from typing import NamedTuple
+from typing import TYPE_CHECKING, NamedTuple
+
+if TYPE_CHECKING:
+    import tkinter as tk
 
 log = logging.getLogger(__name__)
 
@@ -235,6 +237,8 @@ class Overlay:
     def stop(self) -> None:
         if not self._cfg.enabled:
             return
+        import tkinter as tk
+
         root = self._root
         if root is not None:
             # Ask the Tk thread to exit its mainloop; the actual destroy +
@@ -282,6 +286,8 @@ class Overlay:
     # --- Tk-thread internals ---
 
     def _warn_if_font_unresolved(self) -> None:
+        import tkinter as tk
+
         try:
             resolved = self._root.tk.call("font", "actual", self._cfg.font, "-family")
         except tk.TclError:
@@ -291,6 +297,11 @@ class Overlay:
             log.warning("%s", warning)
 
     def _run(self) -> None:
+        # Imported per-method rather than at module scope: Tk ships as a separate
+        # OS package (python3-tk on Debian), and needing it to merely *import*
+        # blurt broke headless installs and CI. Only using an overlay needs it.
+        import tkinter as tk
+
         self._root = tk.Tk()
         self._root.withdraw()
         self._root.overrideredirect(True)
