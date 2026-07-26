@@ -55,7 +55,7 @@ async def _run(host: str, port: int, models: list[str], timeout_ms: int) -> None
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="blurt bench-cleanup")
-    parser.add_argument("--host", default="llmbox")
+    parser.add_argument("--host", default="localhost")
     parser.add_argument("--port", type=int, default=11434)
     parser.add_argument(
         "--models",

@@ -8,7 +8,7 @@ from pathlib import Path
 @dataclass(frozen=True)
 class WhisperConfig:
     backend: str = "wyoming"   # "wyoming" or "whisperlive"
-    host: str = "llmbox"
+    host: str = "localhost"
     port: int = 10300
     model: str = "small.en"    # whisperlive only
     # No-op: WhisperLive takes VAD as a server launch flag and ignores this field.
@@ -24,7 +24,7 @@ class SttConfig:
 @dataclass(frozen=True)
 class CleanupConfig:
     enabled: bool = True
-    host: str = "llmbox"
+    host: str = "localhost"
     port: int = 11434
     model: str = "qwen2.5:1.5b"
     timeout_ms: int = 500

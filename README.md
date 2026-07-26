@@ -1,7 +1,8 @@
 # blurt
 
 Fast personal Linux dictation. Audio is captured locally and streamed to a remote
-speech-to-text server on `llmbox` over Tailscale, with live partial transcripts shown in
+speech-to-text server over the network (Tailscale, in my case), with live partial
+transcripts shown in
 an overlay as you talk. Two backends are supported: **WhisperLive** (WebSocket, streaming
 partials — the default) and **Wyoming faster-whisper** (batch). An optional Ollama cleanup
 pass can fix capitalization and punctuation under a strict latency budget; it is off by
@@ -28,7 +29,7 @@ Right-click the tray icon for "Copy last transcript" (retrieves the last commit 
   standalone Python bundles a Tk built *without* Xft, which renders the overlay
   in a non-anti-aliased bitmap font. Install on the system interpreter (see below).
 - User in the `input` group, and read/write access to `/dev/uinput` (logind grants this to the active seat; needed for the Wayland typer)
-- Remote `llmbox` running one of:
+- A reachable STT host running one of:
     - **WhisperLive** on TCP 9091 (default; `[whisper] backend = "whisperlive"`)
     - Wyoming faster-whisper on TCP 10300 (`backend = "wyoming"`)
 - Optionally, Ollama on HTTP 11434 for the cleanup pass (`[cleanup] enabled = true`)
@@ -57,7 +58,7 @@ separate the candidates.
 
 ## Model selection
 
-Benchmarked 2026-07-25 on `llmbox` (RTX 3080) with `blurt bench-stt` against recorded
+Benchmarked 2026-07-25 on an RTX 3080 with `blurt bench-stt` against recorded
 fixtures, then re-tested under noise and on short clips.
 **Result: `deepdml/faster-whisper-large-v3-turbo-ct2`.**
 
@@ -86,9 +87,9 @@ What turbo costs, all measured:
   session ends, so it only contends with other GPU services during actual dictation.
 - 1.6 GB on disk vs 141 MB, and a slower first load after a whisperlive restart.
 
-**The model is pinned server-side.** `llmbox`'s whisperlive is launched with
-`-fw deepdml/faster-whisper-large-v3-turbo-ct2` (see `command:` in
-`/home/jvogel/compose/whisperlive/docker-compose.yml`). That activates WhisperLive's
+**Pin the model server-side.** These numbers are with whisperlive launched with
+`-fw deepdml/faster-whisper-large-v3-turbo-ct2` (the `command:` in its compose file).
+That activates WhisperLive's
 single-model mode so one instance is reused across connections instead of being rebuilt per
 dictation — which cut time-to-first-partial from ~1.6-2.1s to a flat ~1.1s.
 
@@ -118,7 +119,7 @@ prompt are fine). Avoid `distil-large-v3.5` too: distil models largely ignore
 - `[whisper] use_vad` has **no effect**. WhisperLive takes VAD as a server launch flag
   (`use_vad=self.use_vad` in its `handle_new_connection`) and ignores whatever the client
   sends in its config payload. To change VAD behavior, change how the WhisperLive
-  container is started on `llmbox`.
+  container is started.
 - `[whisper] model` accepts either a Whisper size name (`base.en`, `small.en`) or a
   HuggingFace CTranslate2 repo id. Any model must already be present in the WhisperLive
   container's HuggingFace cache — otherwise the first connection stalls on a multi-GB
@@ -131,12 +132,6 @@ prompt are fine). Avoid `distil-large-v3.5` too: distil models largely ignore
   resolution needs `xdotool getmouselocation`, which under XWayland only sees the pointer
   while it is over an X11 surface and otherwise returns a stale position.
 
-## Design
-
-- Original design: `docs/superpowers/specs/2026-05-23-blurt-design.md`
-- Overlay UX: `docs/superpowers/specs/2026-05-23-blurt-v2-overlay-ux-design.md`
-- Accuracy + placement: `docs/superpowers/specs/2026-07-25-blurt-accuracy-and-placement-design.md`
-
 ## License
 
-Personal use. No license granted.
+MIT — see [LICENSE](LICENSE).

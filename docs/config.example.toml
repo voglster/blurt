@@ -2,9 +2,9 @@
 
 [whisper]
 backend = "whisperlive"   # "whisperlive" (streaming) or "wyoming" (batch)
-host = "llmbox"
+host = "your-stt-host"
 port = 9091
-model = "deepdml/faster-whisper-large-v3-turbo-ct2"   # ADVISORY: llmbox pins the model via -fw
+model = "deepdml/faster-whisper-large-v3-turbo-ct2"   # ADVISORY if the server pins one via -fw
 use_vad = false           # NO-OP: WhisperLive takes VAD as a server launch flag
 
 [stt]
@@ -14,7 +14,7 @@ hotwords = ""
 
 [cleanup]
 enabled = false           # optional Ollama post-pass
-host = "llmbox"
+host = "your-ollama-host"
 port = 11434
 model = "llama3.2:latest"
 timeout_ms = 500

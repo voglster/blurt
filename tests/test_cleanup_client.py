@@ -14,7 +14,7 @@ async def test_cleanup_returns_stripped_response() -> None:
 
     transport = httpx.MockTransport(handler)
     client = CleanupClient(
-        base_url="http://llmbox:11434",
+        base_url="http://ollama-host:11434",
         model="qwen2.5:1.5b",
         timeout_ms=500,
         transport=transport,
@@ -30,7 +30,7 @@ async def test_cleanup_returns_original_on_timeout() -> None:
 
     transport = httpx.MockTransport(handler)
     client = CleanupClient(
-        base_url="http://llmbox:11434",
+        base_url="http://ollama-host:11434",
         model="qwen2.5:1.5b",
         timeout_ms=50,
         transport=transport,
@@ -46,7 +46,7 @@ async def test_cleanup_returns_original_on_http_error() -> None:
 
     transport = httpx.MockTransport(handler)
     client = CleanupClient(
-        base_url="http://llmbox:11434",
+        base_url="http://ollama-host:11434",
         model="qwen2.5:1.5b",
         timeout_ms=500,
         transport=transport,
@@ -66,7 +66,7 @@ async def test_cleanup_empty_input_short_circuits() -> None:
 
     transport = httpx.MockTransport(handler)
     client = CleanupClient(
-        base_url="http://llmbox:11434",
+        base_url="http://ollama-host:11434",
         model="qwen2.5:1.5b",
         timeout_ms=500,
         transport=transport,

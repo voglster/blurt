@@ -1,6 +1,6 @@
 """Measure Wyoming whisper partial cadence and final latency.
 
-Streams a known WAV file in real-time-ish chunks to llmbox:10300 and prints
+Streams a known WAV file in real-time-ish chunks to the target host and prints
 how long it takes to receive each transcript event.
 """
 
@@ -45,7 +45,7 @@ async def _run(host: str, port: int, wav: Path) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="blurt bench-whisper")
-    parser.add_argument("--host", default="llmbox")
+    parser.add_argument("--host", default="localhost")
     parser.add_argument("--port", type=int, default=10300)
     parser.add_argument(
         "--wav",

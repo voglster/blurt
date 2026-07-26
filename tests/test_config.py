@@ -10,12 +10,12 @@ def test_load_minimal_config(tmp_path: Path) -> None:
     cfg_file.write_text(
         textwrap.dedent("""
             [whisper]
-            host = "llmbox"
+            host = "stt-host"
             port = 10300
 
             [cleanup]
             enabled = true
-            host = "llmbox"
+            host = "ollama-host"
             port = 11434
             model = "qwen2.5:1.5b"
             timeout_ms = 500
@@ -35,7 +35,7 @@ def test_load_minimal_config(tmp_path: Path) -> None:
     cfg = load(cfg_file)
 
     assert isinstance(cfg, Config)
-    assert cfg.whisper.host == "llmbox"
+    assert cfg.whisper.host == "stt-host"
     assert cfg.whisper.port == 10300
     assert cfg.cleanup.enabled is True
     assert cfg.cleanup.model == "qwen2.5:1.5b"
@@ -47,7 +47,7 @@ def test_load_minimal_config(tmp_path: Path) -> None:
 def test_load_uses_defaults_when_file_missing(tmp_path: Path) -> None:
     missing = tmp_path / "nope.toml"
     cfg = load(missing)
-    assert cfg.whisper.host == "llmbox"
+    assert cfg.whisper.host == "localhost"
     assert cfg.cleanup.timeout_ms == 500
     assert cfg.hotkey.keycode == "KEY_CALC"
 

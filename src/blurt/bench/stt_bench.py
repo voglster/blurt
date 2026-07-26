@@ -115,7 +115,7 @@ async def _run(
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="blurt bench-stt")
-    parser.add_argument("--host", default="llmbox")
+    parser.add_argument("--host", default="localhost")
     parser.add_argument("--port", type=int, default=9091)
     parser.add_argument(
         "--models", nargs="+",
