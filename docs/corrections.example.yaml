@@ -16,3 +16,5 @@
   replacement: 'JSON'
 - pattern: '(?i)\by\s*a\s*m\s*l\b'
   replacement: 'YAML'
+- pattern: '(?i)\bg[\s-]*cloud\b'
+  replacement: 'gcloud'
