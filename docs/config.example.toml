@@ -27,7 +27,9 @@ device = "auto"
 file = "~/.config/blurt/corrections.yaml"
 
 [overlay]
+position = "top-center"   # "top-center" or "bottom-center"
 monitor = "primary"       # "primary", an output name like "DP-4", or "pointer"
+font = "monospace 22"
 
 [tray]
 enabled = true

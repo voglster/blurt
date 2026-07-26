@@ -199,13 +199,44 @@ def _resolve_monitor_by_signal(
 @dataclass
 class OverlayConfig:
     enabled: bool = True
-    position: str = "bottom-center"
+    position: str = "top-center"
     width_fraction: float = 0.6
-    min_height_px: int = 120
+    min_height_px: int = 150
     max_height_fraction: float = 0.33
     opacity: float = 0.85
-    font: str = "monospace 18"
+    font: str = "monospace 22"
     monitor: str = "primary"
+
+
+_EDGE_MARGIN_PX = 80
+_DEFAULT_POSITION = "top-center"
+
+
+def _overlay_geometry(
+    monitor: tuple[int, int, int, int], cfg: OverlayConfig, height: int
+) -> tuple[int, int, int, int]:
+    """Return (w, h, x, y) for the overlay on `monitor`.
+
+    Both positions sit one margin in from their edge, so they are mirror images.
+    Which edge is anchored decides how the box grows as the transcript gets
+    longer: top-center grows downward and its y never moves, bottom-center grows
+    upward and its y rises with the height.
+    """
+    mx, my, mw, mh = monitor
+    w = int(mw * cfg.width_fraction)
+    x = mx + (mw - w) // 2
+
+    position = cfg.position
+    if position not in ("top-center", "bottom-center"):
+        log.warning(
+            "overlay.position=%r is not a known position; using %s",
+            position, _DEFAULT_POSITION,
+        )
+        position = _DEFAULT_POSITION
+
+    if position == "bottom-center":
+        return w, height, x, my + mh - height - _EDGE_MARGIN_PX
+    return w, height, x, my + _EDGE_MARGIN_PX
 
 
 class Overlay:
@@ -355,10 +386,9 @@ class Overlay:
             self._root.winfo_screenwidth(),
             self._root.winfo_screenheight(),
         )
-        w = int(mw * self._cfg.width_fraction)
-        h = self._cfg.min_height_px
-        x = mx + (mw - w) // 2
-        y = my + mh - h - 80  # 80px above the monitor's bottom edge
+        w, h, x, y = _overlay_geometry(
+            (mx, my, mw, mh), self._cfg, self._cfg.min_height_px
+        )
         self._root.geometry(f"{w}x{h}+{x}+{y}")
         self._root.deiconify()
         self._root.lift()
@@ -406,7 +436,5 @@ class Overlay:
         line_h = int(font_metrics)
         desired = line_count * line_h + 24  # padding
         new_h = min(max(desired, self._cfg.min_height_px), max_h)
-        w = int(mw * self._cfg.width_fraction)
-        new_x = mx + (mw - w) // 2
-        new_y = my + mh - new_h - 80
-        self._root.geometry(f"{w}x{new_h}+{new_x}+{new_y}")
+        w, h, x, y = _overlay_geometry((mx, my, mw, mh), self._cfg, new_h)
+        self._root.geometry(f"{w}x{h}+{x}+{y}")

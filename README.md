@@ -129,7 +129,10 @@ prompt are fine). Avoid `distil-large-v3.5` too: distil models largely ignore
 - `[stt] initial_prompt` and `[stt] hotwords` bias decoding toward your vocabulary at no
   latency cost, and are the preferred fix for mis-transcribed technical terms.
   `corrections.yaml` remains as a deterministic backstop.
-- `[overlay] monitor` selects where the overlay appears: `"primary"` (default), an output
+- `[overlay] position` is `"top-center"` (default) or `"bottom-center"`. Both sit the same
+  distance in from their edge; the anchored edge decides which way the box grows as the
+  transcript lengthens — down from the top, or up from the bottom.
+- `[overlay] monitor` selects which monitor the overlay appears on: `"primary"` (default), an output
   name like `"DP-4"`, or `"pointer"`. Prefer an explicit choice on Wayland — pointer
   resolution needs `xdotool getmouselocation`, which under XWayland only sees the pointer
   while it is over an X11 surface and otherwise returns a stale position.

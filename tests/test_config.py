@@ -56,12 +56,12 @@ def test_overlay_and_clipboard_defaults(tmp_path):
     from blurt.config import load
     cfg = load(tmp_path / "missing.toml")  # nonexistent → defaults
     assert cfg.overlay.enabled is True
-    assert cfg.overlay.position == "bottom-center"
+    assert cfg.overlay.position == "top-center"
     assert cfg.overlay.width_fraction == 0.6
-    assert cfg.overlay.min_height_px == 120
+    assert cfg.overlay.min_height_px == 150
     assert cfg.overlay.max_height_fraction == 0.33
     assert cfg.overlay.opacity == 0.85
-    assert cfg.overlay.font == "monospace 18"
+    assert cfg.overlay.font == "monospace 22"
     assert cfg.clipboard.tool == "xclip"
 
 
