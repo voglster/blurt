@@ -80,10 +80,7 @@ class Daemon:
                 host=self._cfg.whisper.host,
                 port=self._cfg.whisper.port,
             )
-        self._hotkey = HotkeyListener(
-            keycode=self._cfg.hotkey.keycode,
-            device_path=self._cfg.hotkey.device,
-        )
+        self._hotkey = HotkeyListener(bindings=self._cfg.hotkeys)
         self._overlay = Overlay(OverlayConfig(
             enabled=self._cfg.overlay.enabled,
             position=self._cfg.overlay.position,

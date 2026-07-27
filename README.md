@@ -129,6 +129,11 @@ prompt are fine). Avoid `distil-large-v3.5` too: distil models largely ignore
 - `[stt] initial_prompt` and `[stt] hotwords` bias decoding toward your vocabulary at no
   latency cost, and are the preferred fix for mis-transcribed technical terms.
   `corrections.yaml` remains as a deterministic backstop.
+- `[hotkey]` binds one key on one device. For several keyboards use `[[hotkeys]]`, one
+  block per `keycode` + `device` pair; it takes precedence over `[hotkey]`. Every listed
+  device is grabbed while recording, so Enter/Esc/C work from whichever keyboard you
+  reached for, and a keyboard unplugged mid-session no longer stops the others.
+  Prefer a stable `/dev/input/by-id/` or `by-path/` symlink over `eventN`, which renumbers.
 - `[overlay] position` is `"center"` (default), `"top-center"`, or `"bottom-center"`. The
   two edge positions sit the same distance in from their edge, and the anchored edge
   decides which way the box grows as the transcript lengthens — down from the top, up

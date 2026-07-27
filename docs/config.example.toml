@@ -19,9 +19,22 @@ port = 11434
 model = "llama3.2:latest"
 timeout_ms = 500
 
+# One keyboard: the singular form is still fine.
 [hotkey]
 keycode = "KEY_CALC"
 device = "auto"
+
+# Several keyboards: use [[hotkeys]] instead, one block per key. Pin `device`
+# rather than leaving it "auto" when more than one device claims the keycode —
+# HID capability lists are over-declared, so "auto" can pick a device that
+# advertises the key but never emits it.
+# [[hotkeys]]
+# keycode = "KEY_MEDIA"
+# device = "/dev/input/by-path/platform-i8042-serio-0-event-kbd"
+#
+# [[hotkeys]]
+# keycode = "KEY_CALC"
+# device = "/dev/input/by-id/usb-Logitech_USB_Receiver-if02-event-mouse"
 
 [corrections]
 file = "~/.config/blurt/corrections.yaml"

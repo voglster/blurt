@@ -69,14 +69,32 @@ class Config:
     whisper: WhisperConfig = field(default_factory=WhisperConfig)
     stt: SttConfig = field(default_factory=SttConfig)
     cleanup: CleanupConfig = field(default_factory=CleanupConfig)
-    hotkey: HotkeyConfig = field(default_factory=HotkeyConfig)
+    hotkeys: tuple[HotkeyConfig, ...] = (HotkeyConfig(),)
     corrections: CorrectionsConfig = field(default_factory=CorrectionsConfig)
     tray: TrayConfig = field(default_factory=TrayConfig)
     overlay: OverlayConfig = field(default_factory=OverlayConfig)
     clipboard: ClipboardConfig = field(default_factory=ClipboardConfig)
 
+    @property
+    def hotkey(self) -> HotkeyConfig:
+        """The first binding. Kept so single-hotkey callers still read naturally."""
+        return self.hotkeys[0]
+
 
 DEFAULT_PATH = Path.home() / ".config" / "blurt" / "config.toml"
+
+
+def _hotkeys(data: dict) -> tuple[HotkeyConfig, ...]:
+    """Read `[[hotkeys]]`, falling back to the singular `[hotkey]` table.
+
+    The array form pairs each keycode with its own device, which matters when two
+    keyboards use different keys — capability lists are over-declared, so a
+    keycode alone cannot identify the device that emits it.
+    """
+    entries = data.get("hotkeys")
+    if isinstance(entries, list) and entries:
+        return tuple(HotkeyConfig(**entry) for entry in entries)
+    return (HotkeyConfig(**data.get("hotkey", {})),)
 
 
 def load(path: Path | None = None) -> Config:
@@ -89,7 +107,7 @@ def load(path: Path | None = None) -> Config:
         whisper=WhisperConfig(**data.get("whisper", {})),
         stt=SttConfig(**data.get("stt", {})),
         cleanup=CleanupConfig(**data.get("cleanup", {})),
-        hotkey=HotkeyConfig(**data.get("hotkey", {})),
+        hotkeys=_hotkeys(data),
         corrections=CorrectionsConfig(**data.get("corrections", {})),
         tray=TrayConfig(**data.get("tray", {})),
         overlay=OverlayConfig(**data.get("overlay", {})),
