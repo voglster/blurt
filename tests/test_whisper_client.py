@@ -3,7 +3,12 @@ from collections.abc import AsyncIterator
 
 import pytest
 
-from blurt.whisper_client import TranscriptEvent, WhisperLiveServer, WhisperSession
+from blurt.whisper_client import (
+    TranscriptAccumulator,
+    TranscriptEvent,
+    WhisperLiveServer,
+    WhisperSession,
+)
 
 
 class FakeServer:
@@ -101,3 +106,49 @@ async def test_connect_payload_omits_blank_prompt(monkeypatch) -> None:
     config = json.loads(ws.sent[0])
     assert config["initial_prompt"] is None
     assert config["hotwords"] is None
+
+
+def _completed(start: float, text: str) -> dict:
+    return {"start": f"{start:.3f}", "end": f"{start + 1:.3f}", "text": text, "completed": True}
+
+
+def _in_flight(start: float, text: str) -> dict:
+    return {"start": f"{start:.3f}", "end": f"{start + 1:.3f}", "text": text, "completed": False}
+
+
+def test_accumulator_keeps_segments_that_slid_out_of_the_server_window() -> None:
+    accumulator = TranscriptAccumulator()
+    window = [_completed(float(i), f"segment {i}") for i in range(10)]
+    accumulator.absorb(window)
+
+    for i in range(10, 14):
+        window = window[1:] + [_completed(float(i), f"segment {i}")]
+        text = accumulator.absorb(window)
+
+    assert text.startswith("segment 0 segment 1")
+    assert text.endswith("segment 13")
+
+
+def test_accumulator_replaces_the_in_flight_segment_as_it_refines() -> None:
+    accumulator = TranscriptAccumulator()
+    accumulator.absorb([_completed(0.0, "settled."), _in_flight(1.0, "whether the larger change")])
+    text = accumulator.absorb(
+        [_completed(0.0, "settled."), _in_flight(1.0, "whether the larger refactor")]
+    )
+
+    assert text == "settled. whether the larger refactor"
+
+
+def test_accumulator_promotes_the_in_flight_segment_once_it_completes() -> None:
+    accumulator = TranscriptAccumulator()
+    accumulator.absorb([_in_flight(0.0, "was worth")])
+    text = accumulator.absorb([_completed(0.0, "was worth the risk.")])
+
+    assert text == "was worth the risk."
+
+
+def test_accumulator_orders_by_start_not_arrival() -> None:
+    accumulator = TranscriptAccumulator()
+    text = accumulator.absorb([_completed(9.0, "ninth"), _completed(2.0, "second")])
+
+    assert text == "second ninth"

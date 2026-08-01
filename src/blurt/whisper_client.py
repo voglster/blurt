@@ -17,6 +17,40 @@ class TranscriptEvent:
     is_final: bool
 
 
+class TranscriptAccumulator:
+    """Rebuilds the whole transcript from WhisperLive's trailing segment window.
+
+    The server only ever sends its last ``send_last_n_segments`` completed segments
+    plus the one still in flight, so earlier segments fall off the wire while the
+    user keeps talking. Keying completed segments by ``start`` makes re-sends
+    idempotent and keeps anything already seen after it leaves the window.
+    """
+
+    def __init__(self) -> None:
+        self._completed: dict[str, str] = {}
+        self._in_flight: tuple[str, str] | None = None
+
+    def absorb(self, segments: list[dict]) -> str:
+        self._in_flight = None
+        for segment in segments:
+            start = segment.get("start")
+            if start is None:
+                continue
+            text = segment.get("text", "").strip()
+            if segment.get("completed"):
+                self._completed[start] = text
+            else:
+                self._in_flight = (start, text)
+        return self.text
+
+    @property
+    def text(self) -> str:
+        ordered = sorted(self._completed.items(), key=lambda item: float(item[0]))
+        if self._in_flight is not None:
+            ordered.append(self._in_flight)
+        return " ".join(text for _, text in ordered if text).strip()
+
+
 class WhisperServer(Protocol):
     def stream(self, audio_chunks: AsyncIterator[bytes]) -> AsyncIterator[TranscriptEvent]: ...
 
@@ -167,6 +201,7 @@ class WhisperLiveServer:
                 audio_sent_done.set()
 
             loop = asyncio.get_running_loop()
+            accumulator = TranscriptAccumulator()
             last_text_change_time = 0.0
             last_text = ""
             audio_done_time: float | None = None
@@ -218,7 +253,7 @@ class WhisperLiveServer:
                     segments = msg.get("segments")
                     if segments is None:
                         continue
-                    text = " ".join(s.get("text", "").strip() for s in segments).strip()
+                    text = accumulator.absorb(segments)
                     if text and text != last_text:
                         last_text = text
                         last_text_change_time = loop.time()

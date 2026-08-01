@@ -170,14 +170,6 @@ works fine under uv's Python; the overlay font is the only casualty.
 **`[whisper] model` may be ignored** — a server pinned with `-fw` overrides whatever the
 client requests. See [Configuration notes](#configuration-notes).
 
-**Long dictation can lose its opening.** WhisperLive's `prepare_segments` sends only the
-last `send_last_n_segments` (10) completed segments, and `whisper_client.py` types the
-join of whatever arrives — so past that window the start of the transcript silently drops
-off. Segments run 12–17s in practice, putting the threshold around 2–3 minutes of
-continuous speech. Not yet reproduced. The fix is to accumulate completed segments
-client-side by `start` rather than trusting the server's window; every segment already
-carries `completed`, `start`, and `end`, all of which blurt currently discards.
-
 ## License
 
 MIT — see [LICENSE](LICENSE).
