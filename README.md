@@ -118,10 +118,17 @@ prompt are fine). Avoid `distil-large-v3.5` too: distil models largely ignore
 
 ## Configuration notes
 
-- `[whisper] use_vad` has **no effect**. WhisperLive takes VAD as a server launch flag
-  (`use_vad=self.use_vad` in its `handle_new_connection`) and ignores whatever the client
-  sends in its config payload. To change VAD behavior, change how the WhisperLive
-  container is started.
+- **`[whisper] use_vad` should stay `true`.** Current WhisperLive honours it from the
+  client config (`self.use_vad = options.get('use_vad')` in `handle_new_connection`,
+  reaching faster-whisper as `vad_filter`). With it off, silence is decoded, and Whisper
+  answers dead air by inventing text — measured here as 6.5s of silence producing a
+  *completed* segment reading `Claude,Claude Code,Claude Code,Claude Code.`, i.e. this
+  config's own `hotwords` string fed back. Completed segments are what gets typed, so
+  thinking mid-sentence would commit that garbage into your document. With VAD on, the
+  same silence yields nothing and speech either side of the pause is unaffected.
+  (One VAD path genuinely *is* ignored: the frame-drop in `process_audio_frames` sits
+  behind an `is_tensorrt()` check, so it never applies to the faster-whisper backend.
+  Earlier versions of this note over-generalised from that.)
 - `[whisper] model` accepts either a Whisper size name (`base.en`, `small.en`) or a
   HuggingFace CTranslate2 repo id. Any model must already be present in the WhisperLive
   container's HuggingFace cache — otherwise the first connection stalls on a multi-GB
@@ -160,8 +167,16 @@ interpreter, which has an Xft-enabled Tk:
 This is why the install instructions pass `--python /usr/bin/python3`. Everything else
 works fine under uv's Python; the overlay font is the only casualty.
 
-**`[whisper] use_vad` and `[whisper] model` may be ignored** — both are server-side
-launch concerns for WhisperLive. See [Configuration notes](#configuration-notes).
+**`[whisper] model` may be ignored** — a server pinned with `-fw` overrides whatever the
+client requests. See [Configuration notes](#configuration-notes).
+
+**Long dictation can lose its opening.** WhisperLive's `prepare_segments` sends only the
+last `send_last_n_segments` (10) completed segments, and `whisper_client.py` types the
+join of whatever arrives — so past that window the start of the transcript silently drops
+off. Segments run 12–17s in practice, putting the threshold around 2–3 minutes of
+continuous speech. Not yet reproduced. The fix is to accumulate completed segments
+client-side by `start` rather than trusting the server's window; every segment already
+carries `completed`, `start`, and `end`, all of which blurt currently discards.
 
 ## License
 

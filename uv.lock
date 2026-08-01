@@ -16,7 +16,7 @@ wheels = [
 ]
 
 [[package]]
-name = "blurt"
+name = "blurt-stt"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
@@ -24,6 +24,7 @@ dependencies = [
     { name = "httpx" },
     { name = "pillow" },
     { name = "pystray" },
+    { name = "python-xlib", marker = "sys_platform == 'linux'" },
     { name = "pyyaml" },
     { name = "websockets" },
     { name = "wyoming" },
@@ -42,6 +43,7 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.27" },
     { name = "pillow", specifier = ">=10.0" },
     { name = "pystray", specifier = ">=0.19" },
+    { name = "python-xlib", marker = "sys_platform == 'linux'", specifier = ">=0.33" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "websockets", specifier = ">=13.0" },
     { name = "wyoming", specifier = ">=1.5.0" },

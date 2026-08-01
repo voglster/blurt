@@ -127,8 +127,8 @@ class WhisperLiveServer:
         uid = str(uuid.uuid4())
 
         async with connect(uri, max_size=2**24) as ws:
-            # use_vad is sent for completeness only: WhisperLive 0.8.0 passes its own
-            # server launch flag to the backend and ignores this field.
+            # use_vad reaches faster-whisper as vad_filter. Off, silence gets decoded
+            # into invented text that completes and therefore gets typed.
             await ws.send(json.dumps({
                 "uid": uid,
                 "language": self._language,

@@ -5,7 +5,7 @@ backend = "whisperlive"   # "whisperlive" (streaming) or "wyoming" (batch)
 host = "your-stt-host"
 port = 9091
 model = "deepdml/faster-whisper-large-v3-turbo-ct2"   # ADVISORY if the server pins one via -fw
-use_vad = false           # NO-OP: WhisperLive takes VAD as a server launch flag
+use_vad = true            # keep on: off, Whisper hallucinates text over thinking pauses
 
 [stt]
 # Biases decoding toward this vocabulary. Costs no extra latency.
