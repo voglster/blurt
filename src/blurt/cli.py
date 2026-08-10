@@ -4,6 +4,8 @@ import os
 import sys
 from pathlib import Path
 
+from blurt import __version__
+
 
 _LOCK_PATH = Path.home() / ".cache" / "blurt" / "blurt.lock"
 
@@ -29,6 +31,7 @@ def _acquire_singleton_lock() -> int | None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="blurt")
+    parser.add_argument("--version", action="version", version=f"blurt {__version__}")
     sub = parser.add_subparsers(dest="cmd", required=True)
     sub.add_parser("run", help="Run the daemon")
     # add_help=False so `blurt bench-x --help` reaches the bench's own parser,
