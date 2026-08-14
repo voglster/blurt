@@ -5,6 +5,7 @@ import pytest
 
 from blurt.daemon import Daemon, Outcome, State
 from blurt.hotkey import KeyEvent
+from blurt.watchdog import Watchdog
 
 
 def _make_daemon_with_mocks() -> Daemon:
@@ -34,6 +35,7 @@ def _make_daemon_with_mocks() -> Daemon:
     d._current_text = ""
     d._session_error = None
     d._notify_error = MagicMock()
+    d._watchdog = Watchdog(timeout_s=5.0, on_wedge=MagicMock())
     return d
 
 

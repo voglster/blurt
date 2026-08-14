@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import faulthandler
 import logging
+import os
 import signal
 import subprocess
 from enum import Enum
@@ -17,9 +19,18 @@ from blurt.injector import make_typer
 from blurt.overlay import Overlay, OverlayConfig
 from blurt.session import is_wayland
 from blurt.tray import Tray, TrayState
+from blurt.watchdog import Watchdog
 from blurt.whisper_client import WhisperLiveServer, WhisperSession, WyomingServer
 
 log = logging.getLogger(__name__)
+
+# Starting a session is a handful of local calls; it finishes in milliseconds or
+# it is stuck on something that will never finish.
+_SESSION_START_TIMEOUT_S = 5.0
+
+# Distinct from any exit we choose deliberately, so `Restart=on-failure` brings
+# the daemon back and the journal says why.
+_WEDGED_EXIT_CODE = 70
 
 
 def _notify(summary: str, body: str) -> None:
@@ -121,6 +132,9 @@ class Daemon:
         self._paused: bool = False
         self._outcome: Outcome | None = None
         self._session_error: Exception | None = None
+        self._watchdog = Watchdog(
+            timeout_s=_SESSION_START_TIMEOUT_S, on_wedge=self._on_wedge
+        )
 
     # --- callbacks (may be invoked from tray thread) ---
 
@@ -152,17 +166,33 @@ class Daemon:
 
     # --- session ---
 
+    def _on_wedge(self, label: str) -> None:
+        """Last resort when the event loop is stuck on a lock.
+
+        Nothing can safely unblock the stuck thread, and a graceful shutdown
+        would have to wait on it, so dump every thread's stack for diagnosis and
+        let systemd start a daemon that works.
+        """
+        log.error("wedged in %s — dumping thread stacks and exiting to restart", label)
+        faulthandler.dump_traceback(all_threads=True)
+        _notify("blurt wedged", f"stuck in {label}; restarting")
+        os._exit(_WEDGED_EXIT_CODE)
+
     async def _start_session(self) -> None:
         log.info("session start")
-        self._state = State.RECORDING
-        self._set_tray(self._state)
-        self._target_window = self._get_active_window()
-        self._current_text = ""
-        self._session_error = None
-        self._outcome = None
-        self._overlay.show(target_window=self._target_window)
-        self._overlay.set_text("")
-        self._hotkey.set_recording(True)
+        # Everything up to the device grab is synchronous UI work on the event
+        # loop thread. It has no business blocking, but it talks to the tray, Tk
+        # and X — so if it ever does, nothing else in the process can notice.
+        with self._watchdog.guard("start-session"):
+            self._state = State.RECORDING
+            self._set_tray(self._state)
+            self._target_window = self._get_active_window()
+            self._current_text = ""
+            self._session_error = None
+            self._outcome = None
+            self._overlay.show(target_window=self._target_window)
+            self._overlay.set_text("")
+            self._hotkey.set_recording(True)
         self._audio = AudioCapture()
         await self._audio.start()
         self._session_task = asyncio.create_task(self._run_session())
@@ -282,6 +312,12 @@ class Daemon:
 
     async def run(self) -> int:
         logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+        # `kill -USR1 $(systemctl --user show -p MainPID --value blurt)` prints
+        # every thread's Python stack to the journal — the one thing that turns
+        # "it's frozen" into an answer without needing to attach a debugger.
+        faulthandler.enable()
+        faulthandler.register(signal.SIGUSR1, all_threads=True, chain=False)
+        self._watchdog.start()
         log.info(
             "session: wayland=%s, input backend=%s",
             is_wayland(),
@@ -328,6 +364,7 @@ class Daemon:
             self._overlay.stop()
             if self._tray is not None:
                 self._tray.stop()
+            self._watchdog.stop()
         return 0
 
 
