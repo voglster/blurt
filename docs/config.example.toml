@@ -36,6 +36,13 @@ device = "auto"
 # keycode = "KEY_CALC"
 # device = "/dev/input/by-id/usb-Logitech_USB_Receiver-if02-event-mouse"
 
+# Action keys: while recording, press the key and the transcript goes to
+# `command` on stdin instead of being typed into the focused window. One block
+# per sink; omit the section entirely for none.
+# [[actions]]
+# keycode = "KEY_P"
+# command = "piper-send"
+
 [corrections]
 file = "~/.config/blurt/corrections.yaml"
 

@@ -34,6 +34,7 @@ def _make_daemon_with_mocks() -> Daemon:
     d._last_text = ""
     d._current_text = ""
     d._session_error = None
+    d._action_tasks = set()
     d._notify_error = MagicMock()
     d._watchdog = Watchdog(timeout_s=5.0, on_wedge=MagicMock())
     return d

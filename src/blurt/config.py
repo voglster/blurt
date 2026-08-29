@@ -37,6 +37,13 @@ class HotkeyConfig:
 
 
 @dataclass(frozen=True)
+class ActionConfig:
+    """A key that hands the transcript to `command` on stdin instead of typing it."""
+    keycode: str
+    command: str
+
+
+@dataclass(frozen=True)
 class CorrectionsConfig:
     file: str = "~/.config/blurt/corrections.yaml"
 
@@ -70,6 +77,7 @@ class Config:
     stt: SttConfig = field(default_factory=SttConfig)
     cleanup: CleanupConfig = field(default_factory=CleanupConfig)
     hotkeys: tuple[HotkeyConfig, ...] = (HotkeyConfig(),)
+    actions: tuple[ActionConfig, ...] = ()
     corrections: CorrectionsConfig = field(default_factory=CorrectionsConfig)
     tray: TrayConfig = field(default_factory=TrayConfig)
     overlay: OverlayConfig = field(default_factory=OverlayConfig)
@@ -108,6 +116,7 @@ def load(path: Path | None = None) -> Config:
         stt=SttConfig(**data.get("stt", {})),
         cleanup=CleanupConfig(**data.get("cleanup", {})),
         hotkeys=_hotkeys(data),
+        actions=tuple(ActionConfig(**entry) for entry in data.get("actions", [])),
         corrections=CorrectionsConfig(**data.get("corrections", {})),
         tray=TrayConfig(**data.get("tray", {})),
         overlay=OverlayConfig(**data.get("overlay", {})),

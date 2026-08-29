@@ -3,11 +3,12 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import AsyncIterator, Iterable, Sequence
+from dataclasses import dataclass
 from enum import Enum
 
 from evdev import InputDevice, KeyEvent as EvdevKeyEvent, categorize, ecodes, list_devices
 
-from blurt.config import HotkeyConfig
+from blurt.config import ActionConfig, HotkeyConfig
 
 log = logging.getLogger(__name__)
 
@@ -17,6 +18,16 @@ class KeyEvent(Enum):
     COMMIT = "commit"
     CANCEL = "cancel"
     COPY = "copy"
+
+
+@dataclass(frozen=True)
+class ActionEvent:
+    """A configured action key was pressed. Carries its command so consumers
+    need no second lookup, and so a new sink costs only a config block."""
+    command: str
+
+
+Event = KeyEvent | ActionEvent
 
 
 def _find_keyboard_with(keycode: str) -> InputDevice:
@@ -57,6 +68,7 @@ class HotkeyListener:
     def __init__(
         self,
         bindings: Sequence[HotkeyConfig] | None = None,
+        actions: Sequence[ActionConfig] = (),
         keycode: str | None = None,
         device_path: str | None = None,
         device: object | None = None,
@@ -71,6 +83,9 @@ class HotkeyListener:
         self._commit_code = ecodes.ecodes["KEY_ENTER"]
         self._cancel_code = ecodes.ecodes["KEY_ESC"]
         self._copy_code = ecodes.ecodes["KEY_C"]
+        self._action_commands = {
+            ecodes.ecodes[a.keycode]: a.command for a in actions
+        }
         self._recording = False
         self._paused = False
         self._grabbed = False
@@ -134,7 +149,7 @@ class HotkeyListener:
     def set_paused(self, value: bool) -> None:
         self._paused = value
 
-    def _classify(self, code: int, toggle_codes: set[int]) -> KeyEvent | None:
+    def _classify(self, code: int, toggle_codes: set[int]) -> Event | None:
         if code in toggle_codes:
             return None if self._paused else KeyEvent.TOGGLE
         if not self._recording:
@@ -145,6 +160,9 @@ class HotkeyListener:
             return KeyEvent.CANCEL
         if code == self._copy_code:
             return KeyEvent.COPY
+        command = self._action_commands.get(code)
+        if command is not None:
+            return ActionEvent(command)
         return None
 
     async def _pump(self, dev, toggle_codes: set[int], out: asyncio.Queue) -> None:
@@ -171,7 +189,7 @@ class HotkeyListener:
         finally:
             await out.put(None)
 
-    async def events(self) -> AsyncIterator[KeyEvent]:
+    async def events(self) -> AsyncIterator[Event]:
         self._open()
         queue: asyncio.Queue = asyncio.Queue()
         pumps = [

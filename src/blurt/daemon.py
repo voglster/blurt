@@ -4,6 +4,7 @@ import asyncio
 import faulthandler
 import logging
 import os
+import shlex
 import signal
 import subprocess
 from enum import Enum
@@ -14,7 +15,7 @@ from blurt.audio import AudioCapture
 from blurt.cleanup_client import CleanupClient
 from blurt.config import load as load_config
 from blurt.corrections import load as load_corrections
-from blurt.hotkey import HotkeyListener, KeyEvent
+from blurt.hotkey import ActionEvent, Event, HotkeyListener, KeyEvent
 from blurt.injector import make_typer
 from blurt.overlay import Overlay, OverlayConfig
 from blurt.session import is_wayland
@@ -53,6 +54,7 @@ class Outcome(Enum):
     COMMIT = "commit"
     COPY = "copy"
     CANCEL = "cancel"
+    ACTION = "action"
 
 
 def _xdotool_get_active_window() -> int | None:
@@ -91,7 +93,7 @@ class Daemon:
                 host=self._cfg.whisper.host,
                 port=self._cfg.whisper.port,
             )
-        self._hotkey = HotkeyListener(bindings=self._cfg.hotkeys)
+        self._hotkey = HotkeyListener(bindings=self._cfg.hotkeys, actions=self._cfg.actions)
         self._overlay = Overlay(OverlayConfig(
             enabled=self._cfg.overlay.enabled,
             position=self._cfg.overlay.position,
@@ -131,6 +133,7 @@ class Daemon:
         self._current_text: str = ""
         self._paused: bool = False
         self._outcome: Outcome | None = None
+        self._action_tasks: set[asyncio.Task[None]] = set()
         self._session_error: Exception | None = None
         self._watchdog = Watchdog(
             timeout_s=_SESSION_START_TIMEOUT_S, on_wedge=self._on_wedge
@@ -219,7 +222,46 @@ class Daemon:
         if self._state == State.RECORDING:
             await self._finalize(Outcome.CANCEL)
 
-    async def _finalize(self, outcome: Outcome, with_return: bool = False) -> None:
+    def _dispatch_action(self, command: str, text: str) -> None:
+        """Hand `text` to `command` on stdin without waiting for it.
+
+        A sink may take seconds (a network round-trip); _finalize still holds the
+        keyboard grab, so the child runs as a task and the grab is released on
+        the normal schedule."""
+        try:
+            argv = shlex.split(command)
+        except ValueError as exc:
+            self._notify_error(f"action command {command!r} is unparsable: {exc}")
+            return
+        if not argv:
+            self._notify_error(f"action command is empty: {command!r}")
+            return
+        # asyncio keeps only a weak reference to a running task; drop ours and
+        # the sink can be collected mid-flight.
+        task = asyncio.create_task(self._feed_action(argv, text))
+        self._action_tasks.add(task)
+        task.add_done_callback(self._action_tasks.discard)
+
+    async def _feed_action(self, argv: list[str], text: str) -> None:
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                *argv,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+        except OSError as exc:
+            self._notify_error(f"action {argv[0]!r} failed to start: {exc}")
+            return
+        try:
+            await proc.communicate(text.encode())
+        except OSError as exc:
+            log.warning("action %r failed while writing transcript: %s", argv[0], exc)
+
+    async def _finalize(
+        self, outcome: Outcome, with_return: bool = False, command: str | None = None
+    ) -> None:
         """Terminal transition out of RECORDING. Always returns daemon to IDLE.
 
         Fast-path: snapshot whatever the overlay was showing and act on that
@@ -255,8 +297,9 @@ class Daemon:
             self._notify_error(str(self._session_error))
             self._session_error = None
 
-        # Cleanup + corrections only apply on COMMIT and COPY (not CANCEL).
-        if outcome in (Outcome.COMMIT, Outcome.COPY) and text:
+        # Cleanup + corrections apply to every outcome that consumes the text
+        # (not CANCEL) — an action sink gets what a human would have seen.
+        if outcome in (Outcome.COMMIT, Outcome.COPY, Outcome.ACTION) and text:
             if self._cfg.cleanup.enabled:
                 cleaned = await self._cleanup.cleanup(text)
                 if cleaned:
@@ -278,6 +321,10 @@ class Daemon:
         elif outcome == Outcome.COPY:
             self._clipboard_copy(text)
             _ms("clipboard-copied")
+        elif outcome == Outcome.ACTION and command is not None:
+            # Nothing is typed: the sink, not the focused window, is the target.
+            self._dispatch_action(command, text)
+            _ms("action-dispatched")
         # CANCEL: do nothing.
 
         self._hotkey.set_recording(False)
@@ -289,7 +336,7 @@ class Daemon:
         self._target_window = None
         _ms("done")
 
-    async def _handle_key(self, ke: KeyEvent) -> None:
+    async def _handle_key(self, ke: Event) -> None:
         if self._state == State.IDLE:
             if ke == KeyEvent.TOGGLE:
                 await self._start_session()
@@ -304,6 +351,8 @@ class Daemon:
                 await self._finalize(Outcome.COPY)
             elif ke == KeyEvent.CANCEL:
                 await self._finalize(Outcome.CANCEL)
+            elif isinstance(ke, ActionEvent):
+                await self._finalize(Outcome.ACTION, command=ke.command)
             return
 
         log.info("key %s ignored in state=%s", ke, self._state)
