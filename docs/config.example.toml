@@ -48,7 +48,9 @@ file = "~/.config/blurt/corrections.yaml"
 
 [overlay]
 position = "center"       # "center", "top-center", or "bottom-center"
-monitor = "primary"       # "primary", an output name like "DP-4", or "pointer"
+monitor = "primary"       # "primary"/"focused", an output name like "DP-4", or "pointer"
+                          # Wayland has no primary output, so under Hyprland both
+                          # "primary" and "focused" mean the focused monitor.
 font = "monospace 22"
 width_fraction = 0.75
 corner_radius = 14        # 0 for square corners

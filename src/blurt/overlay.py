@@ -1,13 +1,18 @@
 from __future__ import annotations
 
 import gc
+import json
 import logging
 import math
+import os
 import re
 import subprocess
 import threading
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING, NamedTuple
+
+from blurt.session import is_hyprland
 
 if TYPE_CHECKING:
     import tkinter as tk
@@ -16,8 +21,27 @@ log = logging.getLogger(__name__)
 
 
 class MonitorInfo(NamedTuple):
+    """A monitor as X sees it: geometry in XWayland/X11 root coordinates."""
+
     name: str
     primary: bool
+    x: int
+    y: int
+    w: int
+    h: int
+
+
+class HyprMonitor(NamedTuple):
+    """A monitor as Hyprland sees it: geometry in *logical* layout coordinates.
+
+    Deliberately a separate type from MonitorInfo, because the two are in
+    different coordinate spaces and must never be mixed. Hyprland is consulted
+    only to decide *which* monitor to use; the geometry the overlay is actually
+    placed with always comes from X. See `_resolve_monitor`.
+    """
+
+    name: str
+    focused: bool
     x: int
     y: int
     w: int
@@ -36,10 +60,10 @@ def unresolved_font_warning(requested: str, resolved_family: str) -> str | None:
     return (
         f"overlay font {requested!r} did not resolve — Tk fell back to the "
         f"{_LAST_RESORT_FAMILY!r} bitmap font, so the overlay will look blocky and "
-        "un-anti-aliased. This Python's Tk was built without Xft. Reinstall against "
-        "the system interpreter, which has an Xft-enabled Tk: "
-        "`sudo apt install python3-tk` then "
-        "`uv tool install --force --python /usr/bin/python3 --editable .`"
+        "un-anti-aliased. This Python's Tk was built without Xft — uv's standalone "
+        "Python bundles one. Reinstall against a system interpreter whose Tk does have "
+        "Xft: install it first (Arch: `tk`, Debian/Ubuntu: `python3-tk`), then rebuild "
+        "against /usr/bin/python3 — see the install section of the README."
     )
 
 
@@ -86,6 +110,115 @@ def _list_monitors_detailed() -> list[MonitorInfo]:
 def _list_monitors() -> list[tuple[int, int, int, int]]:
     """Return [(x, y, w, h), ...] for every monitor."""
     return [(m.x, m.y, m.w, m.h) for m in _list_monitors_detailed()]
+
+
+def _hyprctl_env() -> dict[str, str] | None:
+    """Environment for a `hyprctl` call, or None to inherit unchanged.
+
+    hyprctl finds its IPC socket via HYPRLAND_INSTANCE_SIGNATURE and refuses to
+    run without it. uwsm exports it into the systemd user environment, so the
+    daemon normally inherits it; a session started some other way may not, and
+    then the sole instance directory under $XDG_RUNTIME_DIR/hypr names it.
+    """
+    if os.environ.get("HYPRLAND_INSTANCE_SIGNATURE"):
+        return None
+    runtime = os.environ.get("XDG_RUNTIME_DIR")
+    if not runtime:
+        return None
+    try:
+        instances = sorted(p.name for p in Path(runtime, "hypr").iterdir() if p.is_dir())
+    except OSError:
+        return None
+    if len(instances) != 1:
+        return None
+    return {**os.environ, "HYPRLAND_INSTANCE_SIGNATURE": instances[0]}
+
+
+def _hyprctl(*args: str) -> str | None:
+    try:
+        return subprocess.run(
+            ["hyprctl", *args],
+            capture_output=True, text=True, check=True, timeout=1.0,
+            env=_hyprctl_env(),
+        ).stdout
+    except (subprocess.SubprocessError, FileNotFoundError) as exc:
+        log.warning("hyprctl %s failed: %s", " ".join(args), exc)
+        return None
+
+
+def _parse_hyprctl_monitors(payload: str) -> list[HyprMonitor]:
+    """Parse `hyprctl monitors -j` into logical-coordinate monitors.
+
+    Hyprland reports each mode in *physical* pixels next to a fractional
+    `scale`, while `x`/`y` are already logical. Dividing the mode by the scale
+    puts the whole rect in the one space Hyprland answers questions in — which
+    is the space `hyprctl cursorpos` reports, and the only reason we parse
+    geometry here at all.
+    """
+    monitors: list[HyprMonitor] = []
+    for m in json.loads(payload):
+        w, h = int(m["width"]), int(m["height"])
+        # transform 1/3/5/7 are the 90 and 270 degree rotations, which swap axes.
+        if int(m.get("transform", 0)) % 2:
+            w, h = h, w
+        scale = float(m.get("scale") or 1.0) or 1.0
+        monitors.append(HyprMonitor(
+            name=str(m.get("name", "")),
+            focused=bool(m.get("focused", False)),
+            x=int(m.get("x", 0)),
+            y=int(m.get("y", 0)),
+            w=round(w / scale),
+            h=round(h / scale),
+        ))
+    return monitors
+
+
+def _list_monitors_hyprland() -> list[HyprMonitor]:
+    out = _hyprctl("monitors", "-j")
+    if out is None:
+        return []
+    try:
+        return _parse_hyprctl_monitors(out)
+    except (ValueError, KeyError, TypeError) as exc:
+        log.warning("hyprctl monitors returned unusable JSON: %s", exc)
+        return []
+
+
+def _pointer_xy_hyprland() -> tuple[int, int] | None:
+    """Pointer position in Hyprland's logical coordinates, or None."""
+    out = _hyprctl("cursorpos", "-j")
+    if out is None:
+        return None
+    try:
+        pos = json.loads(out)
+        return int(pos["x"]), int(pos["y"])
+    except (ValueError, KeyError, TypeError) as exc:
+        log.warning("hyprctl cursorpos returned unusable JSON: %s", exc)
+        return None
+
+
+def _hyprland_monitor_name(preference: str) -> str | None:
+    """Name of the monitor Hyprland says `preference` refers to, or None.
+
+    Only ever returns a *name*. Hyprland's rects are logical and X's are not, so
+    the name is the one value that means the same thing to both — the caller
+    looks it up in the X monitor list to get geometry it can actually place a
+    window with.
+    """
+    monitors = _list_monitors_hyprland()
+    if not monitors:
+        return None
+    if preference == "pointer":
+        pos = _pointer_xy_hyprland()
+        if pos is not None:
+            for m in monitors:
+                if m.x <= pos[0] < m.x + m.w and m.y <= pos[1] < m.y + m.h:
+                    return m.name
+        # No cursor answer: the focused monitor is the better guess than nothing.
+    for m in monitors:
+        if m.focused:
+            return m.name
+    return monitors[0].name
 
 
 def _window_rect(window_id: int) -> tuple[int, int, int, int] | None:
@@ -154,23 +287,44 @@ def _resolve_monitor(
 ) -> tuple[int, int, int, int] | None:
     """Pick the monitor to show the overlay on.
 
-    `preference` is an output name, "primary", or "pointer". Pointer resolution is
-    only trustworthy on X11: under XWayland, XQueryPointer reports the pointer only
-    while it sits over an X11 surface, so on a mostly-Wayland desktop it returns a
-    stale position and the overlay lands on an arbitrary monitor.
+    `preference` is an output name, "primary"/"focused", or "pointer".
+
+    Geometry always comes from xrandr, never from the compositor, because the
+    overlay is an X11 window and xrandr reports the very coordinate space it
+    gets placed in. Under Hyprland that space is not the compositor's: with
+    `xwayland:force_zero_scaling` on, a 2880x1920 panel at scale 2 is 1440x960
+    to Hyprland and the full 2880x1920 to X, and a window asking X for
+    "+600+400" lands at logical 300,200.
+
+    What Hyprland is asked for is only the *name* of the monitor to use, which
+    fixes the two things xrandr genuinely cannot answer under XWayland: it marks
+    no output primary, and pointer resolution via XQueryPointer only sees the
+    cursor while it is over an X11 surface, so on a mostly-Wayland desktop it
+    returns a stale position and the overlay lands on an arbitrary monitor.
     """
     detailed = _list_monitors_detailed()
     if not detailed:
+        # Callers fall back to the Tk root's screen size, which is right for the
+        # single-monitor case and the reason xrandr can be a soft dependency.
         return None
 
-    if preference == "pointer":
-        return _resolve_monitor_by_signal(window_id, [m[2:] for m in detailed])
-
-    if preference != "primary":
+    if preference not in ("primary", "focused", "pointer"):
         for m in detailed:
             if m.name == preference:
                 return m[2:]
         log.warning("overlay.monitor=%r matches no output; using primary", preference)
+        preference = "primary"
+
+    if is_hyprland():
+        name = _hyprland_monitor_name(preference)
+        if name is not None:
+            for m in detailed:
+                if m.name == name:
+                    return m[2:]
+            log.warning("hyprctl chose monitor %r, which xrandr does not list", name)
+
+    if preference == "pointer":
+        return _resolve_monitor_by_signal(window_id, [m[2:] for m in detailed])
 
     for m in detailed:
         if m.primary:

@@ -14,3 +14,16 @@ def is_wayland() -> bool:
     if os.environ.get("XDG_SESSION_TYPE", "").lower() == "wayland":
         return True
     return bool(os.environ.get("WAYLAND_DISPLAY"))
+
+
+def is_hyprland() -> bool:
+    """True when the session's compositor is Hyprland.
+
+    XDG_CURRENT_DESKTOP is what uwsm exports into the systemd user environment,
+    so it is visible to the daemon; HYPRLAND_INSTANCE_SIGNATURE is checked too
+    for sessions started without uwsm.
+    """
+    desktops = os.environ.get("XDG_CURRENT_DESKTOP", "").casefold().split(":")
+    if "hyprland" in desktops:
+        return True
+    return bool(os.environ.get("HYPRLAND_INSTANCE_SIGNATURE"))

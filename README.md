@@ -21,9 +21,13 @@ Right-click the tray icon for "Copy last transcript" (retrieves the last commit 
 ## Requirements
 
 - X11 or Wayland — input injection is auto-detected per session:
-    - **X11:** types via `xdotool`; clipboard via `xclip` (`sudo apt install xclip`)
-    - **Wayland:** types via a `/dev/uinput` virtual keyboard (compositor-agnostic, works on GNOME/Mutter); clipboard via `wl-copy` (`sudo apt install wl-clipboard`)
+    - **X11:** types via `xdotool`; clipboard via `xclip`
+    - **Wayland:** types via a `/dev/uinput` virtual keyboard (compositor-agnostic — no
+      wlroots virtual-keyboard protocol needed, so GNOME/Mutter and Hyprland both work);
+      clipboard via `wl-copy` (`wl-clipboard`)
 - `pw-cat` (PipeWire utils)
+- Monitor layout comes from `hyprctl` under Hyprland and from `xrandr` (`x11-xserver-utils`
+  / `xorg-xrandr`) everywhere else
 - Python 3.12+ with an **Xft-enabled Tk** for the overlay font — install against the
   system interpreter, not uv's. See [Known issues](#known-issues).
 - User in the `input` group, and read/write access to `/dev/uinput` (logind grants this to the active seat; needed for the Wayland typer)
@@ -34,14 +38,42 @@ Right-click the tray icon for "Copy last transcript" (retrieves the last commit 
 
 ## Install
 
+**Debian / Ubuntu:**
+
+    sudo apt install python3-tk xclip wl-clipboard x11-xserver-utils
     # Install on the system interpreter so the overlay gets an Xft (anti-aliased) Tk.
     uv tool install --python /usr/bin/python3 --editable .
+
+**Arch (incl. Omarchy):** take the deps from the repos rather than PyPI — the system
+Python is well ahead of what `evdev` and `pillow` ship wheels for, and building them is
+pointless when packages exist. A `--system-site-packages` venv is what makes those
+visible, and it solves two other things at once: Arch's `tk` is Xft-enabled, and
+`python-gobject` is what lets pystray pick its **SNI/appindicator** backend instead of the
+X11 one — SNI is what the Hyprland status bars actually implement, so the tray icon shows
+up.
+
+    sudo pacman -S --needed tk wl-clipboard \
+      python-evdev python-pillow python-websockets python-httpx python-yaml \
+      python-xlib python-gobject python-pystray libayatana-appindicator
+    python3 -m venv --system-site-packages ~/.local/share/blurt/venv
+    ~/.local/share/blurt/venv/bin/pip install -e .
+    ln -sf ~/.local/share/blurt/venv/bin/blurt ~/.local/bin/blurt
+
+**Both**, once `blurt` is on PATH:
+
     mkdir -p ~/.config/blurt
     cp docs/config.example.toml ~/.config/blurt/config.toml
     cp docs/corrections.example.yaml ~/.config/blurt/corrections.yaml
     cp systemd/blurt.service ~/.config/systemd/user/
     systemctl --user daemon-reload
     systemctl --user enable --now blurt.service
+
+The Wayland typer writes to `/dev/uinput`. logind hands that to the active seat on some
+distros and not others — if `ls -l /dev/uinput` shows `root:root 0600`, grant it to the
+`input` group (which you are already in, for `/dev/input/*`):
+
+    # /etc/udev/rules.d/99-blurt-uinput.rules
+    KERNEL=="uinput", GROUP="input", MODE="0660", OPTIONS+="static_node=uinput"
 
 ## Benchmark + tune
 
@@ -153,10 +185,17 @@ prompt are fine). Avoid `distil-large-v3.5` too: distil models largely ignore
 - `[overlay] corner_radius` rounds the window via the X11 SHAPE extension; `0` is square.
   SHAPE masks are 1-bit, so the curve is hard-edged rather than anti-aliased. If shaping
   fails the overlay falls back to square corners and logs a warning.
-- `[overlay] monitor` selects which monitor the overlay appears on: `"primary"` (default), an output
-  name like `"DP-4"`, or `"pointer"`. Prefer an explicit choice on Wayland — pointer
-  resolution needs `xdotool getmouselocation`, which under XWayland only sees the pointer
-  while it is over an X11 surface and otherwise returns a stale position.
+- `[overlay] monitor` selects which monitor the overlay appears on: `"primary"` (default),
+  `"focused"`, an output name like `"DP-4"`, or `"pointer"`. Wayland has no primary output,
+  so under Hyprland `"primary"` and `"focused"` both mean the focused monitor.
+- **Monitor layout comes from `hyprctl monitors -j` under Hyprland**, and from
+  `xrandr --listmonitors` elsewhere (still the fallback if hyprctl is unreachable). Two
+  reasons, both of which bite on a HiDPI laptop: hyprctl reports each mode in *physical*
+  pixels next to a `scale`, and the overlay is an XWayland window laid out in Hyprland's
+  *logical* coordinates — a 2880x1920 panel at scale 2 is a 1440x960 box, and the raw mode
+  would size the overlay off-screen. And `"pointer"` is only trustworthy through hyprctl:
+  the xdotool fallback asks XQueryPointer, which under XWayland sees the pointer only while
+  it is over an X11 surface and otherwise returns a stale position.
 
 ## Known issues
 
@@ -166,11 +205,12 @@ Tk falls back to the X11 `fixed` bitmap. blurt detects this at startup and logs 
 naming the fix (`journalctl --user -u blurt`). To fix it, install against the system
 interpreter, which has an Xft-enabled Tk:
 
-    sudo apt install python3-tk
+    sudo apt install python3-tk        # Arch: sudo pacman -S tk
     uv tool install --force --python /usr/bin/python3 --editable .
 
-This is why the install instructions pass `--python /usr/bin/python3`. Everything else
-works fine under uv's Python; the overlay font is the only casualty.
+This is why the install instructions pass `--python /usr/bin/python3`, and why the Arch
+path builds a `--system-site-packages` venv instead. Everything else works fine under
+uv's Python; the overlay font is the only casualty.
 
 **`[whisper] model` may be ignored** — a server pinned with `-fw` overrides whatever the
 client requests. See [Configuration notes](#configuration-notes).
