@@ -172,7 +172,10 @@ prompt are fine). Avoid `distil-large-v3.5` too: distil models largely ignore
   block per `keycode` + `device` pair; it takes precedence over `[hotkey]`. Every listed
   device is grabbed while recording, so Enter/Esc/C work from whichever keyboard you
   reached for, and a keyboard unplugged mid-session no longer stops the others.
-  Prefer a stable `/dev/input/by-id/` or `by-path/` symlink over `eventN`, which renumbers.
+  Keyboards may come and go (docks, receivers): one that is missing at start, or
+  unplugged later, is picked up within about 2s of its device path reappearing.
+  Prefer a stable `/dev/input/by-id/` or `by-path/` symlink over `eventN`, which renumbers
+  (and point at a symlink so a replug that lands on a new `eventN` is still found).
 - `[[actions]]` binds extra keys that, while recording, hand the transcript to a command on
   stdin instead of typing it — one block per `keycode` + `command` pair. The text is cleaned
   and corrected exactly as a committed one would be, nothing is typed into the focused window,
